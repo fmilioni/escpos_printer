@@ -431,6 +431,69 @@ await client.printFromString(
 - macOS: permitir Bluetooth no app host quando necessário.
 - Windows: para USB/serial, o endpoint deve apontar para porta/handle acessível (ex: `COM3`).
 
+## Status da impressora
+
+### API de status
+
+- `Future<PrinterStatus> getStatus()`
+- `PrintResult.status` (retornado em `print`, `printFromString` e `printOnce`)
+- `EscPosClient.transportCapabilities` (capabilities da sessão atual)
+- `EscPosClient.transportSessionId` (id da sessão nativa atual)
+
+### Modelo de retorno (`PrinterStatus`)
+
+Todos os campos são `TriState`:
+
+- `TriState.yes`
+- `TriState.no`
+- `TriState.unknown`
+
+Campos:
+
+- `paperOut`
+- `paperNearEnd`
+- `coverOpen`
+- `cutterError`
+- `offline`
+- `drawerSignal`
+
+### Comportamento por transporte
+
+- O status é `best effort`.
+- Se o transporte/plataforma não suportar status em tempo real, os campos retornam `unknown`.
+- Se `getStatus()` falhar internamente por erro de driver/canal, o client também retorna `PrinterStatus.unknown()`.
+
+### Exemplo 1: consultar status após conectar
+
+```dart
+final client = EscPosClient();
+await client.connect(const WifiEndpoint('192.168.0.50', port: 9100));
+
+final capabilities = client.transportCapabilities;
+if (capabilities?.supportsRealtimeStatus == true) {
+  final status = await client.getStatus();
+  if (status.paperOut == TriState.yes) {
+    print('Impressora sem papel');
+  }
+} else {
+  print('Status em tempo real indisponivel nesta sessao');
+}
+```
+
+### Exemplo 2: ler status do resultado da impressão
+
+```dart
+final result = await client.printFromString(
+  template: '@text Pedido OK\n@cut mode=partial',
+  variables: const {},
+);
+
+print('Bytes enviados: ${result.bytesSent}');
+print('Duracao: ${result.duration.inMilliseconds} ms');
+print('PaperOut: ${result.status.paperOut}');
+print('PaperNearEnd: ${result.status.paperNearEnd}');
+```
+
 ## Erros de template
 
 - Variável ausente: `TemplateRenderException`
