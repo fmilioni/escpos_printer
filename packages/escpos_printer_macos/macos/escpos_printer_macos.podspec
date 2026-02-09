@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name             = 'escpos_printer'
+  s.name             = 'escpos_printer_macos'
   s.version          = '0.0.1'
   s.summary          = 'ESC/POS thermal printer plugin.'
   s.description      = <<-DESC

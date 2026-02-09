@@ -21,6 +21,30 @@ dependencies:
     path: ../escpos_printer/packages/escpos_printer
 ```
 
+## Exemplo mobile vertical
+
+Existe um app completo de demonstração em:
+
+- `packages/escpos_printer/example`
+
+Ele cobre:
+
+- busca de impressoras (`searchPrinters`) para Wi-Fi, USB e Bluetooth (onde suportado)
+- conexão manual por Wi-Fi, USB VID/PID, USB serial/path e Bluetooth
+- impressão de ticket demo em 3 modos:
+  - DSL completo
+  - EscTpl string completo
+  - híbrido DSL + `templateBlock`
+- leitura de status e comandos diretos (`feed`, `cut`, `openCashDrawer`)
+
+Para executar:
+
+```bash
+cd /Users/fmilioni/Projetos/escpos_printer/packages/escpos_printer/example
+flutter pub get
+flutter run
+```
+
 ## Fluxo de template na API
 
 Você pode imprimir com template DSL, template string, ou misto.

@@ -31,3 +31,8 @@
   - descoberta por `COM`
   - enriquecimento por `vendorId/productId`
   - fallback de conexão por `vendorId/productId` para resolver COM quando possível.
+- Adicionado app de exemplo mobile em `packages/escpos_printer/example` com:
+  - busca de impressoras (`searchPrinters`)
+  - conexão manual para Wi-Fi/USB/Bluetooth
+  - ticket demo com DSL, EscTpl string e template híbrido
+  - comandos de status, feed, cut e drawer em layout vertical.

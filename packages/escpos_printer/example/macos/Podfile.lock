@@ -1,0 +1,22 @@
+PODS:
+  - escpos_printer_macos (0.0.1):
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
+
+DEPENDENCIES:
+  - escpos_printer_macos (from `Flutter/ephemeral/.symlinks/plugins/escpos_printer_macos/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+
+EXTERNAL SOURCES:
+  escpos_printer_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/escpos_printer_macos/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+
+SPEC CHECKSUMS:
+  escpos_printer_macos: 952c2ef15262479449c4b4f10250018e5aa3bf9b
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+
+COCOAPODS: 1.16.2

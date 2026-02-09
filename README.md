@@ -19,6 +19,7 @@ dependencies:
 A documentação de API (templates DSL/String, parâmetros, `searchPrinters`, status, transportes e exemplos) está em:
 
 - [`packages/escpos_printer/README.md`](packages/escpos_printer/README.md)
+- Exemplo mobile vertical: [`packages/escpos_printer/example`](packages/escpos_printer/example)
 
 ## Estrutura federada
 

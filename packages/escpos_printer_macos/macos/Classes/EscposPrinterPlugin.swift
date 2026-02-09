@@ -249,7 +249,18 @@ private final class WifiNativeConnection: NativeConnection {
   private let stream: OutputStream
 
   init(host: String, port: Int) throws {
-    guard let stream = OutputStream(toHost: host, port: port) else {
+    var readStream: Unmanaged<CFReadStream>?
+    var writeStream: Unmanaged<CFWriteStream>?
+    CFStreamCreatePairWithSocketToHost(
+      nil,
+      host as CFString,
+      UInt32(port),
+      &readStream,
+      &writeStream
+    )
+    _ = readStream
+
+    guard let stream = writeStream?.takeRetainedValue() as OutputStream? else {
       throw NativeTransportError.connectFailed("Falha ao criar stream TCP")
     }
 
@@ -305,7 +316,7 @@ private final class BluetoothNativeConnection: NativeConnection {
       throw NativeTransportError.invalidArgs("Endereco Bluetooth invalido")
     }
 
-    var channelID: BluetoothRFCOMMChannelID = 1
+    let channelID: BluetoothRFCOMMChannelID = 1
     if let serviceUuid, !serviceUuid.isEmpty {
       // `serviceUuid` reservado para extensao futura; por compatibilidade SPP usamos canal 1.
       _ = serviceUuid
@@ -322,12 +333,14 @@ private final class BluetoothNativeConnection: NativeConnection {
   }
 
   func write(_ data: Data) throws {
-    let status = data.withUnsafeBytes { rawBuffer -> IOReturn in
+    var mutableData = data
+    let length = mutableData.count
+    let status = mutableData.withUnsafeMutableBytes { rawBuffer -> IOReturn in
       guard let baseAddress = rawBuffer.baseAddress else {
         return kIOReturnSuccess
       }
 
-      return channel.writeSync(baseAddress, length: UInt16(data.count))
+      return channel.writeSync(baseAddress, length: UInt16(length))
     }
 
     guard status == kIOReturnSuccess else {
@@ -344,7 +357,7 @@ private final class BluetoothNativeConnection: NativeConnection {
   }
 
   func close() {
-    channel.closeChannel()
+    _ = channel.close()
     _ = device
   }
 }
@@ -407,14 +420,10 @@ private struct SerialUsbInfo {
 }
 
 private func serialUsbInfoByPath() -> [String: SerialUsbInfo] {
-  guard let matching = IOServiceMatching(kIOSerialBSDServiceValue) else {
+  guard let matching = IOServiceMatching(kIOSerialBSDServiceValue) as NSMutableDictionary? else {
     return [:]
   }
-  CFDictionarySetValue(
-    matching,
-    Unmanaged.passUnretained(kIOSerialBSDTypeKey as CFString).toOpaque(),
-    Unmanaged.passUnretained(kIOSerialBSDAllTypes as CFString).toOpaque()
-  )
+  matching[kIOSerialBSDTypeKey] = kIOSerialBSDAllTypes
 
   var iterator: io_iterator_t = 0
   guard IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iterator) == KERN_SUCCESS else {
