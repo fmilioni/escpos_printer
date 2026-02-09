@@ -18,7 +18,7 @@ Adicione no `pubspec.yaml`:
 ```yaml
 dependencies:
   escpos_printer:
-    path: ../escpos_printer
+    path: ../escpos_printer/packages/escpos_printer
 ```
 
 ## Fluxo de template na API
@@ -415,6 +415,88 @@ await client.printFromString(
   },
 );
 ```
+
+## Search de impressoras
+
+### API pública
+
+```dart
+Future<List<DiscoveredPrinter>> searchPrinters({
+  PrinterDiscoveryOptions options = const PrinterDiscoveryOptions(),
+})
+```
+
+### `PrinterDiscoveryOptions`
+
+- `transports`: conjunto de transportes para buscar.
+  Default: `{DiscoveryTransport.wifi, DiscoveryTransport.usb, DiscoveryTransport.bluetooth}`
+- `timeout`: timeout global da busca (default `8s`).
+- `wifiPort`: porta TCP para probe Wi-Fi (default `9100`).
+- `wifiHostTimeout`: timeout por host Wi-Fi (default `250ms`).
+- `wifiMaxConcurrentHosts`: limite de probes concorrentes (default `64`).
+- `wifiCidrs`: lista de CIDRs para scan Wi-Fi.
+  Se vazio, a lib detecta interfaces IPv4 locais e usa `/24`.
+
+### `DiscoveredPrinter`
+
+Campos principais:
+
+- `id`
+- `name`
+- `transport` (`wifi`, `usb`, `bluetooth`)
+- `endpoint` (pronto para `client.connect(...)`)
+- `vendorId`, `productId`
+- `comPort`, `serialNumber`
+- `address`, `host`
+- `isPaired`
+- `metadata`
+
+### Exemplo completo
+
+```dart
+final client = EscPosClient();
+
+final printers = await client.searchPrinters(
+  options: const PrinterDiscoveryOptions(
+    transports: <DiscoveryTransport>{
+      DiscoveryTransport.wifi,
+      DiscoveryTransport.usb,
+      DiscoveryTransport.bluetooth,
+    },
+    timeout: Duration(seconds: 6),
+    wifiPort: 9100,
+  ),
+);
+
+for (final printer in printers) {
+  print('[${printer.transport.name}] ${printer.name ?? printer.id}');
+}
+
+if (printers.isNotEmpty) {
+  await client.connect(printers.first.endpoint);
+  await client.printFromString(
+    template: '@text Teste de descoberta\\n@cut mode=partial',
+    variables: const {},
+  );
+  await client.disconnect();
+}
+```
+
+### Comportamento por plataforma/transporte
+
+- Wi-Fi: varredura de sub-rede local com probe TCP na porta configurada (`9100` por default).
+- Bluetooth: busca de dispositivos Classic pareados (sem BLE nesta fase).
+- USB:
+  - Android/Linux: discovery por `vendorId/productId` (quando disponível, também serial/interface).
+  - macOS: discovery de devices seriais (`/dev/cu.*`, `/dev/tty.*`) com enriquecimento `VID/PID` quando disponível.
+  - Windows: discovery de COM + `VID/PID` no mesmo resultado.
+
+### Observações importantes
+
+- Discovery é `best effort`: falha de um transporte não derruba o resultado dos outros.
+- No Windows, para USB, a conexão aceita:
+  - `serialNumber`/`COM` diretamente
+  - ou `vendorId + productId` com resolução de COM quando possível.
 
 ## Observações de transporte
 

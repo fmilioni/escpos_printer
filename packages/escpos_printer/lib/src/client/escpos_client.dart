@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math';
 
+import '../discovery/printer_discovery_service.dart';
 import '../encoding/escpos_encoder.dart';
+import '../model/discovery.dart';
 import '../model/endpoints.dart';
 import '../model/exceptions.dart';
 import '../model/options.dart';
@@ -17,15 +19,18 @@ import '../transport/transport.dart';
 final class EscPosClient {
   EscPosClient({
     TransportFactory? transportFactory,
+    PrinterDiscoveryService? discoveryService,
     ReconnectPolicy reconnectPolicy = const ReconnectPolicy(),
     MustacheRenderer renderer = const MustacheRenderer(),
     EscTplParser parser = const EscTplParser(),
   }) : _transportFactory = transportFactory ?? DefaultTransportFactory(),
+       _discoveryService = discoveryService ?? PrinterDiscoveryService(),
        _defaultReconnectPolicy = reconnectPolicy,
        _renderer = renderer,
        _parser = parser;
 
   final TransportFactory _transportFactory;
+  final PrinterDiscoveryService _discoveryService;
   final ReconnectPolicy _defaultReconnectPolicy;
   final MustacheRenderer _renderer;
   final EscTplParser _parser;
@@ -158,6 +163,14 @@ final class EscPosClient {
       } catch (_) {
         return const PrinterStatus.unknown();
       }
+    });
+  }
+
+  Future<List<DiscoveredPrinter>> searchPrinters({
+    PrinterDiscoveryOptions options = const PrinterDiscoveryOptions(),
+  }) {
+    return _enqueue<List<DiscoveredPrinter>>(() async {
+      return _discoveryService.search(options);
     });
   }
 

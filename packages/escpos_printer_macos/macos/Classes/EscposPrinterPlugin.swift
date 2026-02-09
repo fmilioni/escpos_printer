@@ -3,6 +3,9 @@ import Darwin
 import FlutterMacOS
 import Foundation
 import IOBluetooth
+import IOKit
+import IOKit.serial
+import IOKit.usb
 
 public class EscposPrinterPlugin: NSObject, FlutterPlugin {
   private var sessions: [String: NativeConnection] = [:]
@@ -39,6 +42,10 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
         let payload = try parseArgs(call.arguments)
         let capabilities = try handleGetCapabilities(payload: payload)
         result(capabilities)
+      case "searchPrinters":
+        let payload = (call.arguments as? [String: Any]) ?? [:]
+        let devices = handleSearchPrinters(payload: payload)
+        result(devices)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -73,8 +80,20 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
         serviceUuid: serviceUuid
       )
     case "usb":
-      let serialOrPath = try requiredString(payload, key: "serialNumber")
-      connection = try UsbDeviceFileConnection(serialOrPath: serialOrPath)
+      let serialOrPath = payload["serialNumber"] as? String
+      if let serialOrPath, !serialOrPath.isEmpty {
+        connection = try UsbDeviceFileConnection(serialOrPath: serialOrPath)
+      } else if
+        let vendorId = (payload["vendorId"] as? NSNumber)?.intValue,
+        let productId = (payload["productId"] as? NSNumber)?.intValue,
+        let resolvedPath = resolveSerialPath(vendorId: vendorId, productId: productId)
+      {
+        connection = try UsbDeviceFileConnection(serialOrPath: resolvedPath)
+      } else {
+        throw NativeTransportError.invalidArgs(
+          "Para USB informe serialNumber/path ou vendorId+productId válidos"
+        )
+      }
     default:
       throw NativeTransportError.invalidArgs("Transporte nao suportado: \(transport)")
     }
@@ -127,11 +146,95 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
     return ["capabilities": connection.capabilities()]
   }
 
+  private func handleSearchPrinters(payload: [String: Any]) -> [[String: Any]] {
+    var devices: [[String: Any]] = []
+    if shouldDiscoverTransport(payload: payload, transport: "usb") {
+      devices.append(contentsOf: discoverUsbSerialPrinters())
+    }
+    if shouldDiscoverTransport(payload: payload, transport: "bluetooth") {
+      devices.append(contentsOf: discoverBluetoothPrinters())
+    }
+    return devices
+  }
+
   private func requiredString(_ payload: [String: Any], key: String) throws -> String {
     guard let value = payload[key] as? String, !value.isEmpty else {
       throw NativeTransportError.invalidArgs("Campo obrigatorio ausente: \(key)")
     }
     return value
+  }
+
+  private func shouldDiscoverTransport(payload: [String: Any], transport: String) -> Bool {
+    guard let transports = payload["transports"] as? [String], !transports.isEmpty else {
+      return true
+    }
+    return transports.contains { $0.lowercased() == transport }
+  }
+
+  private func discoverBluetoothPrinters() -> [[String: Any]] {
+    guard let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else {
+      return []
+    }
+
+    return paired.compactMap { device -> [String: Any]? in
+      guard let address = device.addressString, !address.isEmpty else {
+        return nil
+      }
+
+      return [
+        "id": "bluetooth:\(address)",
+        "name": device.nameOrAddress ?? address,
+        "transport": "bluetooth",
+        "address": address,
+        "mode": "classic",
+        "isPaired": true,
+      ]
+    }
+  }
+
+  private func discoverUsbSerialPrinters() -> [[String: Any]] {
+    let infoByPath = serialUsbInfoByPath()
+    let manager = FileManager.default
+    guard let entries = try? manager.contentsOfDirectory(atPath: "/dev") else {
+      return []
+    }
+
+    let serialEntries = entries
+      .filter { $0.hasPrefix("cu.") || $0.hasPrefix("tty.") }
+      .sorted()
+
+    return serialEntries.map { entry in
+      let path = "/dev/\(entry)"
+      let info = infoByPath[path]
+      var metadata: [String: Any] = ["path": path]
+      if let service = info?.serviceName {
+        metadata["serviceName"] = service
+      }
+      var item: [String: Any] = [
+        "id": "usb:\(path)",
+        "name": "Serial \(entry)",
+        "transport": "usb",
+        "serialNumber": path,
+        "metadata": metadata,
+      ]
+      if let vendorId = info?.vendorId {
+        item["vendorId"] = vendorId
+      }
+      if let productId = info?.productId {
+        item["productId"] = productId
+      }
+      return item
+    }
+  }
+
+  private func resolveSerialPath(vendorId: Int, productId: Int) -> String? {
+    return discoverUsbSerialPrinters().first { item in
+      guard let vid = item["vendorId"] as? Int,
+            let pid = item["productId"] as? Int else {
+        return false
+      }
+      return vid == vendorId && pid == productId
+    }?["serialNumber"] as? String
   }
 }
 
@@ -295,6 +398,115 @@ private final class UsbDeviceFileConnection: NativeConnection {
   func close() {
     Darwin.close(fileDescriptor)
   }
+}
+
+private struct SerialUsbInfo {
+  let vendorId: Int?
+  let productId: Int?
+  let serviceName: String?
+}
+
+private func serialUsbInfoByPath() -> [String: SerialUsbInfo] {
+  guard let matching = IOServiceMatching(kIOSerialBSDServiceValue) else {
+    return [:]
+  }
+  CFDictionarySetValue(
+    matching,
+    Unmanaged.passUnretained(kIOSerialBSDTypeKey as CFString).toOpaque(),
+    Unmanaged.passUnretained(kIOSerialBSDAllTypes as CFString).toOpaque()
+  )
+
+  var iterator: io_iterator_t = 0
+  guard IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iterator) == KERN_SUCCESS else {
+    return [:]
+  }
+  defer { IOObjectRelease(iterator) }
+
+  var result: [String: SerialUsbInfo] = [:]
+  while true {
+    let service = IOIteratorNext(iterator)
+    if service == 0 {
+      break
+    }
+    defer { IOObjectRelease(service) }
+
+    guard let callout = ioRegistryStringProperty(service: service, key: kIOCalloutDeviceKey) else {
+      continue
+    }
+
+    let vendorId = lookupUsbIntProperty(service: service, key: "idVendor")
+    let productId = lookupUsbIntProperty(service: service, key: "idProduct")
+    let serviceName = ioRegistryServiceName(service: service)
+    result[callout] = SerialUsbInfo(
+      vendorId: vendorId,
+      productId: productId,
+      serviceName: serviceName
+    )
+  }
+
+  return result
+}
+
+private func ioRegistryServiceName(service: io_registry_entry_t) -> String? {
+  var nameBuffer = [CChar](repeating: 0, count: 128)
+  guard IORegistryEntryGetName(service, &nameBuffer) == KERN_SUCCESS else {
+    return nil
+  }
+  return String(cString: nameBuffer)
+}
+
+private func lookupUsbIntProperty(service: io_registry_entry_t, key: String) -> Int? {
+  var current = service
+  var ownedEntries: [io_registry_entry_t] = []
+  defer {
+    for entry in ownedEntries {
+      IOObjectRelease(entry)
+    }
+  }
+
+  for _ in 0..<8 {
+    if let value = ioRegistryIntProperty(service: current, key: key) {
+      return value
+    }
+
+    var parent: io_registry_entry_t = 0
+    let status = IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent)
+    if status != KERN_SUCCESS || parent == 0 {
+      break
+    }
+    ownedEntries.append(parent)
+    current = parent
+  }
+
+  return nil
+}
+
+private func ioRegistryIntProperty(service: io_registry_entry_t, key: String) -> Int? {
+  guard let unmanaged = IORegistryEntryCreateCFProperty(
+    service,
+    key as CFString,
+    kCFAllocatorDefault,
+    0
+  ) else {
+    return nil
+  }
+  let value = unmanaged.takeRetainedValue()
+  if let number = value as? NSNumber {
+    return number.intValue
+  }
+  return nil
+}
+
+private func ioRegistryStringProperty(service: io_registry_entry_t, key: String) -> String? {
+  guard let unmanaged = IORegistryEntryCreateCFProperty(
+    service,
+    key as CFString,
+    kCFAllocatorDefault,
+    0
+  ) else {
+    return nil
+  }
+  return unmanaged.takeRetainedValue() as? String
 }
 
 private enum NativeTransportError: Error {

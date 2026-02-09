@@ -44,6 +44,103 @@ final class EndpointPayload {
   }
 }
 
+final class DiscoveryRequestPayload {
+  const DiscoveryRequestPayload({
+    this.transports = const <String>[],
+    this.timeoutMs,
+    this.wifiPort,
+    this.wifiCidrs = const <String>[],
+  });
+
+  final List<String> transports;
+  final int? timeoutMs;
+  final int? wifiPort;
+  final List<String> wifiCidrs;
+
+  Map<String, Object?> toMap() {
+    return <String, Object?>{
+      'transports': transports,
+      'timeoutMs': timeoutMs,
+      'wifiPort': wifiPort,
+      'wifiCidrs': wifiCidrs,
+    };
+  }
+}
+
+final class DiscoveredDevicePayload {
+  const DiscoveredDevicePayload({
+    this.id,
+    this.name,
+    required this.transport,
+    this.host,
+    this.port,
+    this.vendorId,
+    this.productId,
+    this.interfaceNumber,
+    this.serialNumber,
+    this.comPort,
+    this.address,
+    this.mode,
+    this.serviceUuid,
+    this.isPaired,
+    this.metadata = const <String, Object?>{},
+  });
+
+  final String? id;
+  final String? name;
+  final String transport;
+  final String? host;
+  final int? port;
+  final int? vendorId;
+  final int? productId;
+  final int? interfaceNumber;
+  final String? serialNumber;
+  final String? comPort;
+  final String? address;
+  final String? mode;
+  final String? serviceUuid;
+  final bool? isPaired;
+  final Map<String, Object?> metadata;
+
+  factory DiscoveredDevicePayload.fromMap(Map<String, Object?> map) {
+    int? readInt(String key) {
+      final raw = map[key];
+      if (raw is int) {
+        return raw;
+      }
+      if (raw is num) {
+        return raw.toInt();
+      }
+      return null;
+    }
+
+    final rawMetadata = map['metadata'];
+    final metadata = rawMetadata is Map<Object?, Object?>
+        ? rawMetadata.map((Object? key, Object? value) {
+            return MapEntry('$key', value);
+          })
+        : <String, Object?>{};
+
+    return DiscoveredDevicePayload(
+      id: map['id'] as String?,
+      name: map['name'] as String?,
+      transport: (map['transport'] as String? ?? '').trim(),
+      host: map['host'] as String?,
+      port: readInt('port'),
+      vendorId: readInt('vendorId'),
+      productId: readInt('productId'),
+      interfaceNumber: readInt('interfaceNumber'),
+      serialNumber: map['serialNumber'] as String?,
+      comPort: map['comPort'] as String?,
+      address: map['address'] as String?,
+      mode: map['mode'] as String?,
+      serviceUuid: map['serviceUuid'] as String?,
+      isPaired: map['isPaired'] as bool?,
+      metadata: metadata,
+    );
+  }
+}
+
 final class CapabilityPayload {
   const CapabilityPayload({
     this.supportsPartialCut = true,
@@ -151,10 +248,7 @@ final class WritePayload {
   final Uint8List bytes;
 
   Map<String, Object?> toMap() {
-    return <String, Object?>{
-      'sessionId': sessionId,
-      'bytes': bytes,
-    };
+    return <String, Object?>{'sessionId': sessionId, 'bytes': bytes};
   }
 }
 
@@ -210,11 +304,14 @@ final class OpenConnectionResponse {
 /// Contrato tipado de host API (implementação compatível com MethodChannel).
 class NativeTransportApi {
   NativeTransportApi({MethodChannel? channel})
-      : _channel = channel ?? const MethodChannel('escpos_printer/native_transport');
+    : _channel =
+          channel ?? const MethodChannel('escpos_printer/native_transport');
 
   final MethodChannel _channel;
 
-  Future<OpenConnectionResponse> openConnection(EndpointPayload endpoint) async {
+  Future<OpenConnectionResponse> openConnection(
+    EndpointPayload endpoint,
+  ) async {
     final raw = await _channel.invokeMapMethod<Object?, Object?>(
       'openConnection',
       endpoint.toMap(),
@@ -269,11 +366,37 @@ class NativeTransportApi {
     });
     final inner = map['capabilities'];
     if (inner is Map<Object?, Object?>) {
-      return CapabilityPayload.fromMap(inner.map((Object? key, Object? value) {
-        return MapEntry('$key', value);
-      }));
+      return CapabilityPayload.fromMap(
+        inner.map((Object? key, Object? value) {
+          return MapEntry('$key', value);
+        }),
+      );
     }
 
     return CapabilityPayload.fromMap(map);
+  }
+
+  Future<List<DiscoveredDevicePayload>> searchPrinters(
+    DiscoveryRequestPayload payload,
+  ) async {
+    final raw = await _channel.invokeListMethod<Object?>(
+      'searchPrinters',
+      payload.toMap(),
+    );
+    if (raw == null) {
+      return const <DiscoveredDevicePayload>[];
+    }
+
+    final devices = <DiscoveredDevicePayload>[];
+    for (final item in raw) {
+      if (item is! Map<Object?, Object?>) {
+        continue;
+      }
+      final map = item.map((Object? key, Object? value) {
+        return MapEntry('$key', value);
+      });
+      devices.add(DiscoveredDevicePayload.fromMap(map));
+    }
+    return List<DiscoveredDevicePayload>.unmodifiable(devices);
   }
 }

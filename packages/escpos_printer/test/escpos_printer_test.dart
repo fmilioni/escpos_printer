@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:escpos_printer/escpos_printer.dart';
+import 'package:escpos_printer/src/discovery/printer_discovery_service.dart';
+import 'package:escpos_printer/src/discovery/wifi_discovery.dart';
+import 'package:escpos_printer_platform_interface/escpos_printer_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -214,6 +217,131 @@ void main() {
       },
     );
   });
+
+  group('Discovery', () {
+    test('agrega Wi-Fi e nativo com deduplicacao por chave estavel', () async {
+      final wifi = FakeWifiDiscovery(<DiscoveredPrinter>[
+        DiscoveredPrinter(
+          id: 'wifi-1',
+          name: 'Printer A',
+          transport: DiscoveryTransport.wifi,
+          endpoint: const WifiEndpoint('192.168.0.10'),
+          host: '192.168.0.10',
+        ),
+        DiscoveredPrinter(
+          id: 'wifi-2-duplicado',
+          name: 'Printer A (dup)',
+          transport: DiscoveryTransport.wifi,
+          endpoint: const WifiEndpoint('192.168.0.10'),
+          host: '192.168.0.10',
+        ),
+      ]);
+
+      final native = FakeDiscoveryBridge(<DiscoveredPrinter>[
+        DiscoveredPrinter(
+          id: 'usb-1',
+          name: 'USB Printer',
+          transport: DiscoveryTransport.usb,
+          endpoint: const UsbEndpoint.serial(
+            'COM5',
+            vendorId: 0x1234,
+            productId: 0x5678,
+          ),
+          comPort: 'COM5',
+          vendorId: 0x1234,
+          productId: 0x5678,
+        ),
+      ]);
+
+      final service = PrinterDiscoveryService(
+        nativeBridge: native,
+        wifiDiscovery: wifi,
+      );
+
+      final result = await service.search(const PrinterDiscoveryOptions());
+
+      expect(result.length, 2);
+      expect(
+        result
+            .where((item) => item.transport == DiscoveryTransport.wifi)
+            .length,
+        1,
+      );
+      expect(
+        result.where((item) => item.transport == DiscoveryTransport.usb).length,
+        1,
+      );
+    });
+
+    test('aplica filtro de transportes na busca', () async {
+      final wifi = FakeWifiDiscovery(<DiscoveredPrinter>[
+        DiscoveredPrinter(
+          id: 'wifi-1',
+          transport: DiscoveryTransport.wifi,
+          endpoint: const WifiEndpoint('192.168.0.20'),
+          host: '192.168.0.20',
+        ),
+      ]);
+      final native = FakeDiscoveryBridge(<DiscoveredPrinter>[
+        DiscoveredPrinter(
+          id: 'bt-1',
+          transport: DiscoveryTransport.bluetooth,
+          endpoint: const BluetoothEndpoint('AA:BB:CC:DD:EE:FF'),
+          address: 'AA:BB:CC:DD:EE:FF',
+          isPaired: true,
+        ),
+      ]);
+
+      final service = PrinterDiscoveryService(
+        nativeBridge: native,
+        wifiDiscovery: wifi,
+      );
+
+      final onlyUsb = await service.search(
+        const PrinterDiscoveryOptions(
+          transports: <DiscoveryTransport>{DiscoveryTransport.usb},
+        ),
+      );
+      expect(onlyUsb, isEmpty);
+
+      final onlyWifi = await service.search(
+        const PrinterDiscoveryOptions(
+          transports: <DiscoveryTransport>{DiscoveryTransport.wifi},
+        ),
+      );
+      expect(onlyWifi.length, 1);
+      expect(onlyWifi.first.transport, DiscoveryTransport.wifi);
+    });
+
+    test(
+      'mapeia USB com COM + VID/PID para endpoint serial no bridge',
+      () async {
+        final bridge = NativeTransportBridge(
+          api: FakeNativeTransportApi(<DiscoveredDevicePayload>[
+            const DiscoveredDevicePayload(
+              id: 'usb-com-3',
+              name: 'POS USB',
+              transport: 'usb',
+              comPort: 'COM3',
+              serialNumber: 'COM3',
+              vendorId: 0x04B8,
+              productId: 0x0E15,
+            ),
+          ]),
+        );
+
+        final devices = await bridge.searchNativePrinters(
+          transports: const <DiscoveryTransport>{DiscoveryTransport.usb},
+        );
+
+        expect(devices.length, 1);
+        final endpoint = devices.first.endpoint as UsbEndpoint;
+        expect(endpoint.serialNumber, 'COM3');
+        expect(endpoint.vendorId, 0x04B8);
+        expect(endpoint.productId, 0x0E15);
+      },
+    );
+  });
 }
 
 bool _containsAscii(List<int> bytes, String value) {
@@ -368,4 +496,50 @@ final class FakeNativeTransportBridge extends NativeTransportBridge {
 
   @override
   Future<void> closeConnection(String sessionId) async {}
+}
+
+final class FakeDiscoveryBridge extends NativeTransportBridge {
+  FakeDiscoveryBridge(this.results);
+
+  final List<DiscoveredPrinter> results;
+
+  @override
+  Future<List<DiscoveredPrinter>> searchNativePrinters({
+    required Set<DiscoveryTransport> transports,
+    Duration timeout = const Duration(seconds: 8),
+    int wifiPort = 9100,
+    List<String> wifiCidrs = const <String>[],
+  }) async {
+    return results
+        .where((device) => transports.contains(device.transport))
+        .toList(growable: false);
+  }
+}
+
+final class FakeWifiDiscovery implements WifiDiscovery {
+  FakeWifiDiscovery(this.results);
+
+  final List<DiscoveredPrinter> results;
+
+  @override
+  Future<List<DiscoveredPrinter>> search(
+    PrinterDiscoveryOptions options,
+  ) async {
+    return results
+        .where((device) => options.transports.contains(device.transport))
+        .toList(growable: false);
+  }
+}
+
+final class FakeNativeTransportApi extends NativeTransportApi {
+  FakeNativeTransportApi(this.discoveredDevices);
+
+  final List<DiscoveredDevicePayload> discoveredDevices;
+
+  @override
+  Future<List<DiscoveredDevicePayload>> searchPrinters(
+    DiscoveryRequestPayload payload,
+  ) async {
+    return discoveredDevices;
+  }
 }

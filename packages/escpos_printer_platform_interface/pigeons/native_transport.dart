@@ -26,10 +26,19 @@ class SessionPayload {
   const SessionPayload();
 }
 
+class DiscoveryRequestPayload {
+  const DiscoveryRequestPayload();
+}
+
+class DiscoveredDevicePayload {
+  const DiscoveredDevicePayload();
+}
+
 abstract class NativeTransportApi {
   OpenConnectionResponse openConnection(EndpointPayload endpoint);
   void write(WritePayload payload);
   StatusPayload readStatus(SessionPayload payload);
   void closeConnection(SessionPayload payload);
   CapabilityPayload getCapabilities(SessionPayload payload);
+  List<DiscoveredDevicePayload> searchPrinters(DiscoveryRequestPayload payload);
 }

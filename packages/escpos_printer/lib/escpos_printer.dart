@@ -1,6 +1,7 @@
 library;
 
 export 'src/client/escpos_client.dart';
+export 'src/model/discovery.dart';
 export 'src/model/endpoints.dart';
 export 'src/model/exceptions.dart';
 export 'src/model/options.dart';

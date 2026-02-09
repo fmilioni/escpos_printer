@@ -35,8 +35,18 @@ final class UsbEndpoint extends PrinterEndpoint {
     this.interfaceNumber,
   });
 
-  final int vendorId;
-  final int productId;
+  const UsbEndpoint.serial(
+    this.serialNumber, {
+    this.vendorId,
+    this.productId,
+    this.interfaceNumber,
+  }) : assert(
+         serialNumber != null && serialNumber != '',
+         'serialNumber/path nao pode ser vazio.',
+       );
+
+  final int? vendorId;
+  final int? productId;
   final String? serialNumber;
   final int? interfaceNumber;
 

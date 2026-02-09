@@ -10,14 +10,14 @@
 #endif
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-FLUTTER_PLUGIN_EXPORT void EscposPrinterPluginCApiRegisterWithRegistrar(
-    FlutterDesktopPluginRegistrarRef registrar);
+    FLUTTER_PLUGIN_EXPORT void EscposPrinterPluginCApiRegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar);
 
 #ifdef __cplusplus
-}  // extern "C"
+} // extern "C"
 #endif
 
-#endif  // FLUTTER_PLUGIN_ESCPOS_PRINTER_PLUGIN_C_API_H_
+#endif // FLUTTER_PLUGIN_ESCPOS_PRINTER_PLUGIN_C_API_H_

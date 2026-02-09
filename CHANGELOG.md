@@ -19,3 +19,15 @@
 - Criada estrutura federada em `packages/` com módulos `escpos_printer`, `escpos_printer_platform_interface`, `escpos_printer_android`, `escpos_printer_linux`, `escpos_printer_macos` e `escpos_printer_windows`.
 - Adicionado contrato tipado de transporte nativo no `escpos_printer_platform_interface`.
 - Testes unitários/integrados para renderização, parsing, reconexão e geração de bytes.
+- Adicionada busca de impressoras via `EscPosClient.searchPrinters(...)` com:
+  - Wi-Fi por varredura de sub-rede e probe TCP (`9100`).
+  - USB nativo em Android/Linux/macOS/Windows.
+  - Bluetooth Classic pareado (quando suportado pela plataforma/permissões).
+- Adicionados novos modelos públicos de discovery:
+  - `DiscoveryTransport`
+  - `PrinterDiscoveryOptions`
+  - `DiscoveredPrinter`
+- USB no Windows com suporte combinado a:
+  - descoberta por `COM`
+  - enriquecimento por `vendorId/productId`
+  - fallback de conexão por `vendorId/productId` para resolver COM quando possível.

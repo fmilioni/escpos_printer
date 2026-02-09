@@ -11,7 +11,7 @@ ESC/POS thermal printer plugin for Flutter.
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'FlutterMacOS'
-  s.frameworks = 'IOBluetooth'
+  s.frameworks = 'IOBluetooth', 'IOKit'
 
   s.platform = :osx, '10.13'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }

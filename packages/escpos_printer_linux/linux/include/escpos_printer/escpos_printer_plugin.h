@@ -12,14 +12,14 @@ G_BEGIN_DECLS
 #endif
 
 typedef struct _EscposPrinterPlugin EscposPrinterPlugin;
-typedef struct {
-  GObjectClass parent_class;
+typedef struct
+{
+    GObjectClass parent_class;
 } EscposPrinterPluginClass;
 
 FLUTTER_PLUGIN_EXPORT GType escpos_printer_plugin_get_type();
-FLUTTER_PLUGIN_EXPORT void escpos_printer_plugin_register_with_registrar(
-    FlPluginRegistrar* registrar);
+FLUTTER_PLUGIN_EXPORT void escpos_printer_plugin_register_with_registrar(FlPluginRegistrar *registrar);
 
 G_END_DECLS
 
-#endif  // FLUTTER_PLUGIN_ESCPOS_PRINTER_PLUGIN_H_
+#endif // FLUTTER_PLUGIN_ESCPOS_PRINTER_PLUGIN_H_

@@ -1,8 +1,11 @@
 package com.fmilioni.escpos_printer
 
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
@@ -40,6 +43,7 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
                 "readStatus" -> handleReadStatus(call, result)
                 "closeConnection" -> handleCloseConnection(call, result)
                 "getCapabilities" -> handleGetCapabilities(call, result)
+                "searchPrinters" -> handleSearchPrinters(call, result)
                 else -> result.notImplemented()
             }
         } catch (error: Throwable) {
@@ -101,6 +105,24 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
 
         val connection = sessions[sessionId] ?: throw IllegalStateException("Sessao nao encontrada: $sessionId")
         result.success(mapOf("capabilities" to connection.capabilities()))
+    }
+
+    private fun handleSearchPrinters(call: MethodCall, result: Result) {
+        val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+        val transports = (args["transports"] as? List<*>)
+            ?.mapNotNull { (it as? String)?.lowercase() }
+            ?.toSet()
+            ?: setOf("usb", "bluetooth")
+        val devices = mutableListOf<Map<String, Any?>>()
+
+        if (transports.contains("usb")) {
+            devices += discoverUsbPrinters()
+        }
+        if (transports.contains("bluetooth")) {
+            devices += discoverBluetoothPrinters()
+        }
+
+        result.success(devices)
     }
 
     private fun openUsbConnection(args: Map<*, *>): NativeConnection {
@@ -171,6 +193,59 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
         return manager.deviceList.values.firstOrNull {
             it.vendorId == vendorId && it.productId == productId
         }
+    }
+
+    private fun discoverUsbPrinters(): List<Map<String, Any?>> {
+        val manager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+        val devices = mutableListOf<Map<String, Any?>>()
+        for (device in manager.deviceList.values) {
+            val usbInterface = pickInterface(device, null) ?: continue
+            val endpoint = pickBulkOutEndpoint(usbInterface) ?: continue
+            val serialNumber = runCatching { device.serialNumber }.getOrNull()
+            val id = "usb:${device.vendorId}:${device.productId}:${serialNumber ?: device.deviceName}"
+            val name = device.productName ?: device.deviceName ?: "USB ${device.vendorId}:${device.productId}"
+            devices += mapOf(
+                "id" to id,
+                "name" to name,
+                "transport" to "usb",
+                "vendorId" to device.vendorId,
+                "productId" to device.productId,
+                "interfaceNumber" to usbInterface.id,
+                "serialNumber" to serialNumber,
+                "metadata" to mapOf(
+                    "endpointAddress" to endpoint.address,
+                    "hasPermission" to manager.hasPermission(device),
+                    "deviceClass" to device.deviceClass,
+                ),
+            )
+        }
+        return devices
+    }
+
+    private fun discoverBluetoothPrinters(): List<Map<String, Any?>> {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return emptyList()
+        }
+
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()
+        val devices = mutableListOf<Map<String, Any?>>()
+        for (device in adapter.bondedDevices) {
+            if (device.type == android.bluetooth.BluetoothDevice.DEVICE_TYPE_LE) {
+                continue
+            }
+            val address = device.address ?: continue
+            devices += mapOf(
+                "id" to "bluetooth:$address",
+                "name" to (device.name ?: address),
+                "transport" to "bluetooth",
+                "address" to address,
+                "mode" to "classic",
+                "isPaired" to true,
+            )
+        }
+        return devices
     }
 
     private fun pickInterface(device: UsbDevice, interfaceNumber: Int?): UsbInterface? {
