@@ -1,0 +1,15 @@
+name: escpos_printer_platform_interface
+description: Platform interface and typed host contract for escpos_printer.
+version: 0.0.1
+publish_to: none
+homepage:
+
+environment:
+  sdk: ^3.10.8
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:

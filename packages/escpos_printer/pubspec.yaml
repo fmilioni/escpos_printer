@@ -1,36 +1,32 @@
 name: escpos_printer
-description: "Flutter library/plugin for ESC/POS thermal printing with Wi-Fi, USB and Bluetooth transports."
+description: Flutter library/plugin for ESC/POS thermal printing with Wi-Fi, USB and Bluetooth transports.
 version: 0.0.1
 publish_to: none
 homepage:
 
 environment:
   sdk: ^3.10.8
-  flutter: ">=1.17.0"
+  flutter: ">=3.22.0"
 
 dependencies:
   flutter:
     sdk: flutter
   escpos_printer_platform_interface:
-    path: packages/escpos_printer_platform_interface
+    path: ../escpos_printer_platform_interface
   escpos_printer_android:
-    path: packages/escpos_printer_android
+    path: ../escpos_printer_android
   escpos_printer_linux:
-    path: packages/escpos_printer_linux
+    path: ../escpos_printer_linux
   escpos_printer_macos:
-    path: packages/escpos_printer_macos
+    path: ../escpos_printer_macos
   escpos_printer_windows:
-    path: packages/escpos_printer_windows
+    path: ../escpos_printer_windows
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
 flutter:
   plugin:
     platforms:

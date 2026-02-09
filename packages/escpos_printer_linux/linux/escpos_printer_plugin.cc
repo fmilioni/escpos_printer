@@ -1,0 +1,564 @@
+#include "include/escpos_printer/escpos_printer_plugin.h"
+
+#include <flutter_linux/flutter_linux.h>
+#include <libusb-1.0/libusb.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/rfcomm.h>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+
+#include <atomic>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+
+#define ESCPOS_PRINTER_PLUGIN(obj) \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj), escpos_printer_plugin_get_type(), \
+                              EscposPrinterPlugin))
+
+struct _EscposPrinterPlugin {
+  GObject parent_instance;
+};
+
+G_DEFINE_TYPE(EscposPrinterPlugin, escpos_printer_plugin, g_object_get_type())
+
+namespace {
+
+enum class SessionKind {
+  kWifi,
+  kBluetooth,
+  kUsb,
+};
+
+struct NativeConnection {
+  SessionKind kind;
+  int fd = -1;
+
+  libusb_context* usb_context = nullptr;
+  libusb_device_handle* usb_handle = nullptr;
+  int usb_interface_number = -1;
+  uint8_t usb_endpoint_out = 0;
+};
+
+std::unordered_map<std::string, std::unique_ptr<NativeConnection>> g_sessions;
+std::mutex g_sessions_mutex;
+std::atomic<int64_t> g_session_counter{1};
+
+FlMethodResponse* MakeErrorResponse(const std::string& code,
+                                    const std::string& message) {
+  return FL_METHOD_RESPONSE(
+      fl_method_error_response_new(code.c_str(), message.c_str(), nullptr));
+}
+
+FlValue* MakeCapabilitiesValue(bool realtime_status = false) {
+  g_autoptr(FlValue) caps = fl_value_new_map();
+  fl_value_set_string(caps, "supportsPartialCut", fl_value_new_bool(true));
+  fl_value_set_string(caps, "supportsFullCut", fl_value_new_bool(true));
+  fl_value_set_string(caps, "supportsDrawerKick", fl_value_new_bool(true));
+  fl_value_set_string(caps, "supportsRealtimeStatus",
+                      fl_value_new_bool(realtime_status));
+  fl_value_set_string(caps, "supportsQrCode", fl_value_new_bool(true));
+  fl_value_set_string(caps, "supportsBarcode", fl_value_new_bool(true));
+  fl_value_set_string(caps, "supportsImage", fl_value_new_bool(true));
+
+  return fl_value_ref(caps);
+}
+
+FlValue* MakeUnknownStatusValue() {
+  g_autoptr(FlValue) status = fl_value_new_map();
+  fl_value_set_string(status, "paperOut", fl_value_new_string("unknown"));
+  fl_value_set_string(status, "paperNearEnd", fl_value_new_string("unknown"));
+  fl_value_set_string(status, "coverOpen", fl_value_new_string("unknown"));
+  fl_value_set_string(status, "cutterError", fl_value_new_string("unknown"));
+  fl_value_set_string(status, "offline", fl_value_new_string("unknown"));
+  fl_value_set_string(status, "drawerSignal", fl_value_new_string("unknown"));
+
+  return fl_value_ref(status);
+}
+
+std::string BuildSessionId() {
+  std::ostringstream out;
+  out << "linux-session-" << g_session_counter.fetch_add(1);
+  return out.str();
+}
+
+bool IsNullValue(FlValue* value) {
+  return value == nullptr || fl_value_get_type(value) == FL_VALUE_TYPE_NULL;
+}
+
+bool ReadRequiredString(FlValue* map,
+                        const char* key,
+                        std::string* out,
+                        std::string* error) {
+  FlValue* value = fl_value_lookup_string(map, key);
+  if (IsNullValue(value) || fl_value_get_type(value) != FL_VALUE_TYPE_STRING) {
+    *error = std::string("Campo obrigatorio ausente ou invalido: ") + key;
+    return false;
+  }
+
+  const gchar* raw = fl_value_get_string(value);
+  if (raw == nullptr || std::strlen(raw) == 0) {
+    *error = std::string("Campo obrigatorio vazio: ") + key;
+    return false;
+  }
+
+  *out = raw;
+  return true;
+}
+
+bool ReadOptionalInt(FlValue* map, const char* key, int* out) {
+  FlValue* value = fl_value_lookup_string(map, key);
+  if (IsNullValue(value)) {
+    return false;
+  }
+  if (fl_value_get_type(value) != FL_VALUE_TYPE_INT) {
+    return false;
+  }
+
+  *out = static_cast<int>(fl_value_get_int(value));
+  return true;
+}
+
+std::string LastErrnoText(const char* context) {
+  std::ostringstream out;
+  out << context << ": " << std::strerror(errno);
+  return out.str();
+}
+
+bool FindUsbBulkOutEndpoint(libusb_device_handle* handle,
+                            int preferred_interface,
+                            int* interface_number,
+                            uint8_t* endpoint_out) {
+  libusb_device* device = libusb_get_device(handle);
+  if (device == nullptr) {
+    return false;
+  }
+
+  libusb_config_descriptor* config = nullptr;
+  int rc = libusb_get_active_config_descriptor(device, &config);
+  if (rc != 0 || config == nullptr) {
+    return false;
+  }
+
+  bool found = false;
+
+  for (int i = 0; i < config->bNumInterfaces && !found; i++) {
+    const libusb_interface& ifc = config->interface[i];
+    for (int j = 0; j < ifc.num_altsetting && !found; j++) {
+      const libusb_interface_descriptor& alt = ifc.altsetting[j];
+      if (preferred_interface >= 0 && alt.bInterfaceNumber != preferred_interface) {
+        continue;
+      }
+
+      for (int k = 0; k < alt.bNumEndpoints; k++) {
+        const libusb_endpoint_descriptor& ep = alt.endpoint[k];
+        bool is_bulk = (ep.bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) ==
+                       LIBUSB_TRANSFER_TYPE_BULK;
+        bool is_out = (ep.bEndpointAddress & LIBUSB_ENDPOINT_DIR_MASK) ==
+                      LIBUSB_ENDPOINT_OUT;
+        if (is_bulk && is_out) {
+          *interface_number = alt.bInterfaceNumber;
+          *endpoint_out = ep.bEndpointAddress;
+          found = true;
+          break;
+        }
+      }
+    }
+  }
+
+  libusb_free_config_descriptor(config);
+  return found;
+}
+
+int OpenTcpSocket(const std::string& host, int port, std::string* error) {
+  struct addrinfo hints;
+  std::memset(&hints, 0, sizeof(hints));
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_family = AF_UNSPEC;
+
+  char port_buffer[16];
+  std::snprintf(port_buffer, sizeof(port_buffer), "%d", port);
+
+  struct addrinfo* result = nullptr;
+  int rc = getaddrinfo(host.c_str(), port_buffer, &hints, &result);
+  if (rc != 0) {
+    *error = std::string("Falha ao resolver host: ") + gai_strerror(rc);
+    return -1;
+  }
+
+  int socket_fd = -1;
+  for (struct addrinfo* addr = result; addr != nullptr; addr = addr->ai_next) {
+    socket_fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+    if (socket_fd < 0) {
+      continue;
+    }
+
+    if (connect(socket_fd, addr->ai_addr, addr->ai_addrlen) == 0) {
+      break;
+    }
+
+    close(socket_fd);
+    socket_fd = -1;
+  }
+
+  freeaddrinfo(result);
+
+  if (socket_fd < 0) {
+    *error = LastErrnoText("Falha ao conectar socket TCP");
+  }
+
+  return socket_fd;
+}
+
+void CloseNativeConnection(NativeConnection* connection) {
+  if (connection == nullptr) {
+    return;
+  }
+
+  if (connection->fd >= 0) {
+    close(connection->fd);
+    connection->fd = -1;
+  }
+
+  if (connection->usb_handle != nullptr) {
+    if (connection->usb_interface_number >= 0) {
+      libusb_release_interface(connection->usb_handle,
+                               connection->usb_interface_number);
+    }
+    libusb_close(connection->usb_handle);
+    connection->usb_handle = nullptr;
+  }
+
+  if (connection->usb_context != nullptr) {
+    libusb_exit(connection->usb_context);
+    connection->usb_context = nullptr;
+  }
+}
+
+FlMethodResponse* HandleOpenConnection(FlValue* args) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    return MakeErrorResponse("invalid_args", "openConnection requer payload map.");
+  }
+
+  std::string transport;
+  std::string parse_error;
+  if (!ReadRequiredString(args, "transport", &transport, &parse_error)) {
+    return MakeErrorResponse("invalid_args", parse_error);
+  }
+
+  std::unique_ptr<NativeConnection> connection = std::make_unique<NativeConnection>();
+
+  if (transport == "wifi") {
+    std::string host;
+    if (!ReadRequiredString(args, "host", &host, &parse_error)) {
+      return MakeErrorResponse("invalid_args", parse_error);
+    }
+
+    int port = 9100;
+    ReadOptionalInt(args, "port", &port);
+
+    std::string socket_error;
+    int fd = OpenTcpSocket(host, port, &socket_error);
+    if (fd < 0) {
+      return MakeErrorResponse("connect_failed", socket_error);
+    }
+
+    connection->kind = SessionKind::kWifi;
+    connection->fd = fd;
+  } else if (transport == "bluetooth") {
+    std::string address;
+    if (!ReadRequiredString(args, "address", &address, &parse_error)) {
+      return MakeErrorResponse("invalid_args", parse_error);
+    }
+
+    int channel = 1;
+    int socket_fd = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
+    if (socket_fd < 0) {
+      return MakeErrorResponse("connect_failed",
+                               LastErrnoText("Falha ao criar socket Bluetooth"));
+    }
+
+    sockaddr_rc addr = {};
+    addr.rc_family = AF_BLUETOOTH;
+    addr.rc_channel = static_cast<uint8_t>(channel);
+    if (str2ba(address.c_str(), &addr.rc_bdaddr) != 0) {
+      close(socket_fd);
+      return MakeErrorResponse("invalid_args", "Endereco Bluetooth invalido.");
+    }
+
+    if (connect(socket_fd, reinterpret_cast<struct sockaddr*>(&addr),
+                sizeof(addr)) != 0) {
+      std::string err = LastErrnoText("Falha ao conectar Bluetooth RFCOMM");
+      close(socket_fd);
+      return MakeErrorResponse("connect_failed", err);
+    }
+
+    connection->kind = SessionKind::kBluetooth;
+    connection->fd = socket_fd;
+  } else if (transport == "usb") {
+    int vendor_id = 0;
+    int product_id = 0;
+    if (!ReadOptionalInt(args, "vendorId", &vendor_id) ||
+        !ReadOptionalInt(args, "productId", &product_id)) {
+      return MakeErrorResponse("invalid_args",
+                               "vendorId e productId sao obrigatorios para USB.");
+    }
+
+    int preferred_interface = -1;
+    ReadOptionalInt(args, "interfaceNumber", &preferred_interface);
+
+    libusb_context* usb_context = nullptr;
+    int rc = libusb_init(&usb_context);
+    if (rc != 0 || usb_context == nullptr) {
+      return MakeErrorResponse("connect_failed", "Falha ao inicializar libusb.");
+    }
+
+    libusb_device_handle* usb_handle =
+        libusb_open_device_with_vid_pid(usb_context, vendor_id, product_id);
+    if (usb_handle == nullptr) {
+      libusb_exit(usb_context);
+      return MakeErrorResponse("connect_failed",
+                               "Dispositivo USB nao encontrado (vendorId/productId).");
+    }
+
+    int interface_number = -1;
+    uint8_t endpoint_out = 0;
+    if (!FindUsbBulkOutEndpoint(usb_handle, preferred_interface,
+                                &interface_number, &endpoint_out)) {
+      libusb_close(usb_handle);
+      libusb_exit(usb_context);
+      return MakeErrorResponse("connect_failed",
+                               "Endpoint BULK OUT nao encontrado para USB.");
+    }
+
+    if (libusb_kernel_driver_active(usb_handle, interface_number) == 1) {
+      libusb_detach_kernel_driver(usb_handle, interface_number);
+    }
+
+    rc = libusb_claim_interface(usb_handle, interface_number);
+    if (rc != 0) {
+      libusb_close(usb_handle);
+      libusb_exit(usb_context);
+      return MakeErrorResponse("connect_failed", "Falha ao claim da interface USB.");
+    }
+
+    connection->kind = SessionKind::kUsb;
+    connection->usb_context = usb_context;
+    connection->usb_handle = usb_handle;
+    connection->usb_interface_number = interface_number;
+    connection->usb_endpoint_out = endpoint_out;
+  } else {
+    return MakeErrorResponse("invalid_args",
+                             "Transporte invalido. Use wifi, usb ou bluetooth.");
+  }
+
+  std::string session_id = BuildSessionId();
+  {
+    std::lock_guard<std::mutex> lock(g_sessions_mutex);
+    g_sessions[session_id] = std::move(connection);
+  }
+
+  g_autoptr(FlValue) response_map = fl_value_new_map();
+  fl_value_set_string(response_map, "sessionId",
+                      fl_value_new_string(session_id.c_str()));
+  fl_value_set_string(response_map, "capabilities", MakeCapabilitiesValue(false));
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(response_map));
+}
+
+FlMethodResponse* HandleWrite(FlValue* args) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    return MakeErrorResponse("invalid_args", "write requer payload map.");
+  }
+
+  std::string session_id;
+  std::string parse_error;
+  if (!ReadRequiredString(args, "sessionId", &session_id, &parse_error)) {
+    return MakeErrorResponse("invalid_args", parse_error);
+  }
+
+  FlValue* bytes_value = fl_value_lookup_string(args, "bytes");
+  if (IsNullValue(bytes_value) ||
+      fl_value_get_type(bytes_value) != FL_VALUE_TYPE_UINT8_LIST) {
+    return MakeErrorResponse("invalid_args", "Campo bytes deve ser Uint8List.");
+  }
+
+  const uint8_t* bytes = fl_value_get_uint8_list(bytes_value);
+  size_t length = fl_value_get_length(bytes_value);
+
+  std::lock_guard<std::mutex> lock(g_sessions_mutex);
+  auto iterator = g_sessions.find(session_id);
+  if (iterator == g_sessions.end()) {
+    return MakeErrorResponse("invalid_session", "Sessao nao encontrada.");
+  }
+
+  NativeConnection* connection = iterator->second.get();
+  if (connection->kind == SessionKind::kUsb) {
+    int transferred = 0;
+    int rc = libusb_bulk_transfer(connection->usb_handle,
+                                  connection->usb_endpoint_out,
+                                  const_cast<unsigned char*>(bytes),
+                                  static_cast<int>(length), &transferred,
+                                  4000);
+    if (rc != 0 || transferred != static_cast<int>(length)) {
+      return MakeErrorResponse("write_failed", "Falha ao enviar bytes via USB.");
+    }
+  } else {
+    ssize_t written = send(connection->fd, bytes, length, 0);
+    if (written < 0 || static_cast<size_t>(written) != length) {
+      return MakeErrorResponse("write_failed", LastErrnoText("Falha ao enviar bytes"));
+    }
+  }
+
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+}
+
+FlMethodResponse* HandleReadStatus(FlValue* args) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    return MakeErrorResponse("invalid_args", "readStatus requer payload map.");
+  }
+
+  std::string session_id;
+  std::string parse_error;
+  if (!ReadRequiredString(args, "sessionId", &session_id, &parse_error)) {
+    return MakeErrorResponse("invalid_args", parse_error);
+  }
+
+  std::lock_guard<std::mutex> lock(g_sessions_mutex);
+  auto iterator = g_sessions.find(session_id);
+  if (iterator == g_sessions.end()) {
+    return MakeErrorResponse("invalid_session", "Sessao nao encontrada.");
+  }
+
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(MakeUnknownStatusValue()));
+}
+
+FlMethodResponse* HandleCloseConnection(FlValue* args) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    return MakeErrorResponse("invalid_args", "closeConnection requer payload map.");
+  }
+
+  std::string session_id;
+  std::string parse_error;
+  if (!ReadRequiredString(args, "sessionId", &session_id, &parse_error)) {
+    return MakeErrorResponse("invalid_args", parse_error);
+  }
+
+  std::unique_ptr<NativeConnection> connection;
+  {
+    std::lock_guard<std::mutex> lock(g_sessions_mutex);
+    auto iterator = g_sessions.find(session_id);
+    if (iterator == g_sessions.end()) {
+      return FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+    }
+
+    connection = std::move(iterator->second);
+    g_sessions.erase(iterator);
+  }
+
+  CloseNativeConnection(connection.get());
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+}
+
+FlMethodResponse* HandleGetCapabilities(FlValue* args) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    return MakeErrorResponse("invalid_args", "getCapabilities requer payload map.");
+  }
+
+  std::string session_id;
+  std::string parse_error;
+  if (!ReadRequiredString(args, "sessionId", &session_id, &parse_error)) {
+    return MakeErrorResponse("invalid_args", parse_error);
+  }
+
+  std::lock_guard<std::mutex> lock(g_sessions_mutex);
+  auto iterator = g_sessions.find(session_id);
+  if (iterator == g_sessions.end()) {
+    return MakeErrorResponse("invalid_session", "Sessao nao encontrada.");
+  }
+
+  g_autoptr(FlValue) result_map = fl_value_new_map();
+  fl_value_set_string(result_map, "capabilities", MakeCapabilitiesValue(false));
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(result_map));
+}
+
+void CloseAllSessions() {
+  std::unordered_map<std::string, std::unique_ptr<NativeConnection>> current;
+  {
+    std::lock_guard<std::mutex> lock(g_sessions_mutex);
+    current.swap(g_sessions);
+  }
+
+  for (auto& entry : current) {
+    CloseNativeConnection(entry.second.get());
+  }
+}
+
+}  // namespace
+
+static void escpos_printer_plugin_handle_method_call(
+    EscposPrinterPlugin* self,
+    FlMethodCall* method_call) {
+  const gchar* method = fl_method_call_get_name(method_call);
+  FlValue* args = fl_method_call_get_args(method_call);
+
+  g_autoptr(FlMethodResponse) response = nullptr;
+
+  if (strcmp(method, "openConnection") == 0) {
+    response = HandleOpenConnection(args);
+  } else if (strcmp(method, "write") == 0) {
+    response = HandleWrite(args);
+  } else if (strcmp(method, "readStatus") == 0) {
+    response = HandleReadStatus(args);
+  } else if (strcmp(method, "closeConnection") == 0) {
+    response = HandleCloseConnection(args);
+  } else if (strcmp(method, "getCapabilities") == 0) {
+    response = HandleGetCapabilities(args);
+  } else {
+    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+  }
+
+  fl_method_call_respond(method_call, response, nullptr);
+}
+
+static void escpos_printer_plugin_dispose(GObject* object) {
+  CloseAllSessions();
+  G_OBJECT_CLASS(escpos_printer_plugin_parent_class)->dispose(object);
+}
+
+static void escpos_printer_plugin_class_init(EscposPrinterPluginClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = escpos_printer_plugin_dispose;
+}
+
+static void escpos_printer_plugin_init(EscposPrinterPlugin* self) {}
+
+static void method_call_cb(FlMethodChannel* channel,
+                           FlMethodCall* method_call,
+                           gpointer user_data) {
+  EscposPrinterPlugin* plugin = ESCPOS_PRINTER_PLUGIN(user_data);
+  escpos_printer_plugin_handle_method_call(plugin, method_call);
+}
+
+void escpos_printer_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
+  EscposPrinterPlugin* plugin = ESCPOS_PRINTER_PLUGIN(
+      g_object_new(escpos_printer_plugin_get_type(), nullptr));
+
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) channel = fl_method_channel_new(
+      fl_plugin_registrar_get_messenger(registrar),
+      "escpos_printer/native_transport",
+      FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(channel, method_call_cb,
+                                            g_object_ref(plugin),
+                                            g_object_unref);
+
+  g_object_unref(plugin);
+}

@@ -1,0 +1,27 @@
+name: escpos_printer_windows
+description: Windows implementation for escpos_printer.
+version: 0.0.1
+publish_to: none
+homepage:
+
+environment:
+  sdk: ^3.10.8
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  escpos_printer_platform_interface:
+    path: ../escpos_printer_platform_interface
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    implements: escpos_printer
+    platforms:
+      windows:
+        pluginClass: EscposPrinterPluginCApi
