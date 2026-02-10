@@ -1,6 +1,6 @@
 name: escpos_printer_workspace
 description: "Workspace do projeto escpos_printer (monorepo federado)."
-version: 0.0.1
+version: 0.0.2
 publish_to: none
 homepage:
 

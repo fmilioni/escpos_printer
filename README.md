@@ -1,12 +1,12 @@
 # escpos_printer (workspace)
 
-Este diretório é um **workspace monorepo**. A implementação pública do package está em:
+This directory is a **monorepo workspace**. The public package implementation is located at:
 
 - `packages/escpos_printer`
 
-A pasta `lib/` da raiz foi removida de propósito. Use o package da pasta `packages/escpos_printer`.
+The root `lib/` folder was intentionally removed. Use the package from `packages/escpos_printer`.
 
-## Como usar no app (path local)
+## How to use in your app (local path)
 
 ```yaml
 dependencies:
@@ -14,18 +14,18 @@ dependencies:
     path: ../escpos_printer/packages/escpos_printer
 ```
 
-## Documentação completa
+## Full documentation
 
-A documentação de API (templates DSL/String, parâmetros, `searchPrinters`, status, transportes e exemplos) está em:
+Complete API documentation (DSL/String templates, parameters, `searchPrinters`, status, transports, and examples) is available at:
 
 - [`packages/escpos_printer/README.md`](packages/escpos_printer/README.md)
-- Exemplo mobile vertical: [`packages/escpos_printer/example`](packages/escpos_printer/example)
+- Vertical mobile example: [`packages/escpos_printer/example`](packages/escpos_printer/example)
 
-## Estrutura federada
+## Federated structure
 
-- `packages/escpos_printer`: API pública e core
-- `packages/escpos_printer_platform_interface`: contrato tipado
-- `packages/escpos_printer_android`: implementação Android
-- `packages/escpos_printer_linux`: implementação Linux
-- `packages/escpos_printer_macos`: implementação macOS
-- `packages/escpos_printer_windows`: implementação Windows
+- `packages/escpos_printer`: public API and core
+- `packages/escpos_printer_platform_interface`: typed contract
+- `packages/escpos_printer_android`: Android implementation
+- `packages/escpos_printer_linux`: Linux implementation
+- `packages/escpos_printer_macos`: macOS implementation
+- `packages/escpos_printer_windows`: Windows implementation

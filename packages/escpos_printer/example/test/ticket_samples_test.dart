@@ -4,7 +4,7 @@ import 'package:escpos_printer_example/src/ticket_samples.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('DSL sample gera operacoes essenciais', () {
+  test('DSL sample generates core operations', () {
     final data = defaultDemoTicketData();
     final template = buildDslTicketTemplate(data);
 
@@ -21,7 +21,7 @@ void main() {
     expect(ops.any((op) => op is DrawerKickOp), isTrue);
   });
 
-  test('EscTpl sample contem comandos e placeholders esperados', () {
+  test('EscTpl sample contains expected commands and placeholders', () {
     final image = buildSampleRasterImage(widthBytes: 2, heightDots: 2);
     final template = buildEscTplTicketString(image: image);
 
@@ -37,13 +37,13 @@ void main() {
     expect(template, contains('{{#if shouldCut}}'));
   });
 
-  test('parseDemoItems converte texto em lista de itens', () {
-    final items = parseDemoItems('Cafe=9,90\nPao de queijo=6,50');
+  test('parseDemoItems converts text into item list', () {
+    final items = parseDemoItems('Coffee=9.90\nCheese bread=6.50');
 
     expect(items.length, 2);
-    expect(items[0].name, 'Cafe');
-    expect(items[0].price, '9,90');
-    expect(items[1].name, 'Pao de queijo');
-    expect(items[1].price, '6,50');
+    expect(items[0].name, 'Coffee');
+    expect(items[0].price, '9.90');
+    expect(items[1].name, 'Cheese bread');
+    expect(items[1].price, '6.50');
   });
 }

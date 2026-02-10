@@ -1,5 +1,5 @@
 name: escpos_printer_example
-description: "App exemplo mobile para search, conexao e impressao com escpos_printer."
+description: "Mobile demo app for printer search, connection, and printing with escpos_printer."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

@@ -1,19 +1,19 @@
 # escpos_printer
 
-Library Flutter para impressão térmica ESC/POS com suporte a:
+Flutter library/plugin for ESC/POS thermal printing with support for:
 
-- Template DSL tipado
-- Template textual via `String` (EscTpl)
-- Variáveis Mustache (`{{var}}`, `{{#each}}`, `{{#if}}`)
-- Operações ESC/POS: `text`, `row`, `qrcode`, `barcode`, `image`, `feed`, `cut`, `drawer`
-- Sessão gerenciada (`connect` + `print`) e one-shot (`printOnce`)
-- Retry e reconexão em memória
-- Transportes: `Wi-Fi` (Dart), `USB` e `Bluetooth Classic` (bridge nativa)
-- Arquitetura federada em `packages/`
+- Typed DSL templates
+- String templates (`EscTpl`)
+- Mustache variables (`{{var}}`, `{{#each}}`, `{{#if}}`)
+- ESC/POS operations: `text`, `row`, `qrcode`, `barcode`, `image`, `feed`, `cut`, `drawer`
+- Managed session mode (`connect` + `print`) and one-shot mode (`printOnce`)
+- In-memory retry and reconnection
+- Transports: `Wi-Fi` (Dart), `USB` and `Bluetooth Classic` (native bridge)
+- Federated architecture under `packages/`
 
-## Instalação
+## Installation
 
-Adicione no `pubspec.yaml`:
+Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -21,23 +21,23 @@ dependencies:
     path: ../escpos_printer/packages/escpos_printer
 ```
 
-## Exemplo mobile vertical
+## Vertical mobile example
 
-Existe um app completo de demonstração em:
+A complete demo app is available at:
 
 - `packages/escpos_printer/example`
 
-Ele cobre:
+It includes:
 
-- busca de impressoras (`searchPrinters`) para Wi-Fi, USB e Bluetooth (onde suportado)
-- conexão manual por Wi-Fi, USB VID/PID, USB serial/path e Bluetooth
-- impressão de ticket demo em 3 modos:
-  - DSL completo
-  - EscTpl string completo
-  - híbrido DSL + `templateBlock`
-- leitura de status e comandos diretos (`feed`, `cut`, `openCashDrawer`)
+- printer discovery (`searchPrinters`) for Wi-Fi, USB, and Bluetooth (where supported)
+- manual connection via Wi-Fi, USB VID/PID, USB serial/path, and Bluetooth
+- demo ticket printing in 3 modes:
+  - full DSL
+  - full EscTpl string
+  - hybrid DSL + `templateBlock`
+- status reading and direct commands (`feed`, `cut`, `openCashDrawer`)
 
-Para executar:
+Run it with:
 
 ```bash
 cd /Users/fmilioni/Projetos/escpos_printer/packages/escpos_printer/example
@@ -45,9 +45,9 @@ flutter pub get
 flutter run
 ```
 
-## Fluxo de template na API
+## Template flow in the API
 
-Você pode imprimir com template DSL, template string, ou misto.
+You can print with DSL templates, string templates, or a hybrid approach.
 
 ```dart
 final client = EscPosClient();
@@ -56,116 +56,128 @@ await client.connect(const WifiEndpoint('192.168.0.50', port: 9100));
 
 await client.print(
   template: ReceiptTemplate.dsl((b) {
-    b.text('MINHA LOJA', bold: true, align: TextAlign.center);
+    b.text('MY STORE', bold: true, align: TextAlign.center);
   }),
-  variables: const {'store': 'MINHA LOJA'},
+  variables: const {'store': 'MY STORE'},
   renderOptions: const TemplateRenderOptions(strictMissingVariables: true),
-  printOptions: const PrintOptions(paperWidthChars: 48, initializePrinter: true),
+  printOptions: const PrintOptions(
+    paperWidthChars: 48,
+    initializePrinter: true,
+    codeTable: EscPosCodeTable.wcp1252,
+  ),
 );
 ```
 
-### Métodos de impressão com template
+### Print methods
 
 - `print({required ReceiptTemplate template, Map<String, Object?> variables = const {}, TemplateRenderOptions renderOptions = const TemplateRenderOptions(), PrintOptions printOptions = const PrintOptions()})`
 - `printFromString({required String template, required Map<String, Object?> variables, TemplateRenderOptions renderOptions = const TemplateRenderOptions(), PrintOptions printOptions = const PrintOptions()})`
 - `printOnce({required PrinterEndpoint endpoint, required ReceiptTemplate template, Map<String, Object?> variables = const {}, TemplateRenderOptions renderOptions = const TemplateRenderOptions(), PrintOptions printOptions = const PrintOptions(), ReconnectPolicy? reconnectPolicy})`
 
-Parâmetros de template:
+Template-related parameters:
 
-- `template`: `ReceiptTemplate.dsl(...)` ou `ReceiptTemplate.string(...)`.
-- `variables`: mapa de variáveis usado pelo Mustache (`{{...}}`).
+- `template`: `ReceiptTemplate.dsl(...)` or `ReceiptTemplate.string(...)`
+- `variables`: map used by Mustache (`{{...}}`)
 - `renderOptions.strictMissingVariables`:
-  - `true` (default): variável ausente gera `TemplateRenderException`.
-  - `false`: variável ausente é ignorada.
+  - `true` (default): missing variable throws `TemplateRenderException`
+  - `false`: missing variable is ignored
 
-## Modos de template
+`PrintOptions` parameters:
+
+- `paperWidthChars`: logical print width in columns (for example, `32` for 58mm, `48` for 80mm)
+- `initializePrinter`: sends `ESC @` before the job
+- `codeTable`: sends `ESC t n` when `initializePrinter=true`
+  - default: `EscPosCodeTable.wcp1252` (recommended for PT-BR accented text)
+  - use `null` to skip code table selection
+
+## Template modes
 
 - `ReceiptTemplate.dsl(void Function(ReceiptBuilder b) build)`
 - `ReceiptTemplate.string(String template)`
 
-Exemplo híbrido (DSL + bloco string):
+Hybrid example (DSL + string block):
 
 ```dart
 final template = ReceiptTemplate.dsl((b) {
-  b.text('Pedido', bold: true, align: TextAlign.center);
-  b.textTemplate('Cliente: {{name}}', vars: {'name': 'Ana'});
+  b.text('Order', bold: true, align: TextAlign.center);
+  b.textTemplate('Customer: {{name}}', vars: {'name': 'Ana'});
   b.templateBlock('''
 @row
   @col flex=3 Item
   @col flex=1 align=right {{total}}
 @endrow
 @cut mode=partial
-''', vars: {'total': 'R\$ 10,50'});
+''', vars: {'total': r'R$ 10,50'});
 });
 ```
 
-## Arquitetura Federada
+## Federated architecture
 
-- `packages/escpos_printer`: package principal (API pública e core).
-- `packages/escpos_printer_platform_interface`: contrato tipado de transporte nativo.
-- `packages/escpos_printer_android`: implementação Android.
-- `packages/escpos_printer_linux`: implementação Linux.
-- `packages/escpos_printer_macos`: implementação macOS.
-- `packages/escpos_printer_windows`: implementação Windows.
+- `packages/escpos_printer`: main package (public API + core)
+- `packages/escpos_printer_platform_interface`: typed native transport contract
+- `packages/escpos_printer_android`: Android implementation
+- `packages/escpos_printer_linux`: Linux implementation
+- `packages/escpos_printer_macos`: macOS implementation
+- `packages/escpos_printer_windows`: Windows implementation
 
-O package raiz mantém compatibilidade e mapeia `default_package` para as implementações federadas.
+The root package keeps compatibility and maps `default_package` to federated implementations.
 
-## Referência completa do DSL (`ReceiptBuilder`)
+## Full DSL reference (`ReceiptBuilder`)
 
-### Estilo de texto reutilizado por `text`, `textTemplate` e `col`
+### Shared text style (`text`, `textTemplate`, and `col`)
 
-Parâmetros de estilo:
+Style parameters:
 
 - `bold`: `bool`, default `false`
 - `underline`: `bool`, default `false`
 - `invert`: `bool`, default `false`
 - `font`: `FontType.a | FontType.b`, default `FontType.a`
-- `widthScale`: `int` de `1` a `8`, default `1`
-- `heightScale`: `int` de `1` a `8`, default `1`
+- `widthScale`: `int` from `1` to `8`, default `1`
+- `heightScale`: `int` from `1` to `8`, default `1`
 - `align`: `TextAlign.left | TextAlign.center | TextAlign.right`, default `TextAlign.left`
 
-### 1) Texto
+### 1) Text
 
-- `text(String value, { ...estilo })`
-- `textTemplate(String template, {Map<String, Object?> vars = const {}, ...estilo})`
+- `text(String value, { ...style })`
+- `textTemplate(String template, {Map<String, Object?> vars = const {}, ...style})`
 
-Observações:
+Notes:
 
-- `textTemplate` renderiza Mustache antes de virar `TextOp`.
-- `vars` local tem precedência sobre `variables` global do `print`.
+- `textTemplate` renders Mustache before becoming a `TextOp`
+- local `vars` override global `variables` from `print`
 
-### 2) Bloco de template string no DSL
+### 2) String template block inside DSL
 
 - `templateBlock(String template, {Map<String, Object?> vars = const {}})`
 
-Observações:
+Notes:
 
-- Renderiza Mustache e depois parseia EscTpl.
-- Útil para trechos longos de layout sem perder DSL no restante.
+- renders Mustache, then parses EscTpl
+- useful for longer structured blocks while keeping DSL for the rest
 
-### 3) Múltiplas colunas na mesma linha
+### 3) Multiple columns in one line
 
 - `row(List<RowColumnSpec> columns)`
-- `col(String text, {int flex = 1, TextAlign align = TextAlign.left, ...estilo})`
+- `col(String text, {int flex = 1, TextAlign align = TextAlign.left, ...style})`
 
-Regras:
+Rules:
 
-- `flex` deve ser `>= 1`.
-- `row` precisa de ao menos 1 coluna.
+- `flex` must be `>= 1`
+- `row` must contain at least one column
 
 ### 4) QRCode
 
 - `qrCode(String data, {int size = 6, TextAlign align = TextAlign.left})`
 
-Regras:
+Rules:
 
-- `size` de `1` a `16`.
+- `size` from `1` to `16`
 
-### 5) Código de barras
+### 5) Barcode
 
 - `barcode(String data, {BarcodeType type = BarcodeType.code39, int height = 80, TextAlign align = TextAlign.left})`
 
-`BarcodeType` suportados:
+Supported `BarcodeType`:
 
 - `upca`
 - `upce`
@@ -174,17 +186,17 @@ Regras:
 - `code39`
 - `code128`
 
-Regras:
+Rules:
 
-- `height` de `1` a `255`.
+- `height` from `1` to `255`
 
-### 6) Imagem raster
+### 6) Raster image
 
 - `imageRaster(Uint8List rasterData, {required int widthBytes, required int heightDots, int mode = 0, TextAlign align = TextAlign.left})`
 
-Regras:
+Rules:
 
-- `mode` de `0` a `3`
+- `mode` from `0` to `3`
 - `widthBytes > 0`
 - `heightDots > 0`
 
@@ -192,11 +204,11 @@ Regras:
 
 - `feed([int lines = 1])`
 
-Regras:
+Rules:
 
-- `lines` de `0` a `255`.
+- `lines` from `0` to `255`
 
-### 8) Corte
+### 8) Cut
 
 - `cut([CutMode mode = CutMode.partial])`
 
@@ -205,7 +217,7 @@ Regras:
 - `CutMode.partial`
 - `CutMode.full`
 
-### 9) Gaveta
+### 9) Drawer
 
 - `drawer({DrawerPin pin = DrawerPin.pin2, int onMs = 120, int offMs = 240})`
 
@@ -214,49 +226,49 @@ Regras:
 - `DrawerPin.pin2`
 - `DrawerPin.pin5`
 
-Regras:
+Rules:
 
-- `onMs` de `0` a `255`
-- `offMs` de `0` a `255`
+- `onMs` from `0` to `255`
+- `offMs` from `0` to `255`
 
-## Referência completa do template string (`EscTpl`)
+## Full string template reference (`EscTpl`)
 
-### Sintaxe geral
+### General syntax
 
-- Cada comando deve iniciar com `@`.
-- Linhas vazias são ignoradas.
-- Linhas iniciadas com `#` são comentários.
-- Formato: `@comando attr=valor attr2="valor com espaco" conteudo`
-- Se houver conteúdo após os atributos, ele vira `content` do comando.
+- each command must start with `@`
+- blank lines are ignored
+- lines starting with `#` are comments
+- format: `@command attr=value attr2="value with spaces" content`
+- text after attributes becomes command `content`
 
-### Comandos suportados
+### Supported commands
 
 #### `@text`
 
 ```text
-@text align=center bold=true width=2 height=2 Olá
-@text text="Olá com atributo"
+@text align=center bold=true width=2 height=2 Hello
+@text text="Hello from attribute"
 ```
 
-Parâmetros:
+Parameters:
 
-- Conteúdo: texto da linha.
-- Opcionalmente `text=...` quando não quiser usar conteúdo posicional.
-- Estilo aceito: `align`, `bold`, `underline`, `invert`, `font`, `width`, `height`.
+- content text
+- optional `text=...` when you do not want positional content
+- style keys: `align`, `bold`, `underline`, `invert`, `font`, `width`, `height`
 
 #### `@row` / `@col`
 
 ```text
 @row
-  @col flex=2 Produto
+  @col flex=2 Product
   @col flex=1 align=right bold=true 10,50
 @endrow
 ```
 
-Parâmetros de `@col`:
+`@col` parameters:
 
-- Conteúdo (ou `text=...`)
-- `flex` (default `1`, mínimo `1`)
+- content (or `text=...`)
+- `flex` (default `1`, minimum `1`)
 - `align` (`left|center|right`)
 - `bold`, `underline`, `invert`
 - `font` (`a|b`)
@@ -269,9 +281,9 @@ Parâmetros de `@col`:
 @qrcode size=6 align=center 000201010211...
 ```
 
-Parâmetros:
+Parameters:
 
-- Conteúdo ou `data=...` (obrigatório)
+- content or `data=...` (required)
 - `size` (`1..16`, default `6`)
 - `align` (`left|center|right`, default `left`)
 
@@ -281,9 +293,9 @@ Parâmetros:
 @barcode type=code128 height=90 align=center 789123456789
 ```
 
-Parâmetros:
+Parameters:
 
-- Conteúdo ou `data=...` (obrigatório)
+- content or `data=...` (required)
 - `type` (`upca|upce|ean13|ean8|code39|code128`, default `code39`)
 - `height` (`1..255`, default `80`)
 - `align` (`left|center|right`, default `left`)
@@ -294,11 +306,11 @@ Parâmetros:
 @image widthBytes=48 heightDots=120 mode=0 align=center iVBORw0KGgoAAA...
 ```
 
-Parâmetros:
+Parameters:
 
-- Conteúdo ou `data=...` com Base64 (obrigatório)
-- `widthBytes` (obrigatório, `> 0`)
-- `heightDots` (obrigatório, `> 0`)
+- content or `data=...` in Base64 (required)
+- `widthBytes` (required, `> 0`)
+- `heightDots` (required, `> 0`)
 - `mode` (`0..3`, default `0`)
 - `align` (`left|center|right`, default `left`)
 
@@ -309,10 +321,10 @@ Parâmetros:
 @feed 3
 ```
 
-Parâmetros:
+Parameters:
 
 - `lines` (`0..255`, default `1`)
-- Também aceita conteúdo numérico (`@feed 3`)
+- numeric positional content also supported (`@feed 3`)
 
 #### `@cut`
 
@@ -321,9 +333,9 @@ Parâmetros:
 @cut mode=full
 ```
 
-Parâmetros:
+Parameters:
 
-- `mode`: `partial` (default) ou `full`
+- `mode`: `partial` (default) or `full`
 
 #### `@drawer`
 
@@ -331,23 +343,23 @@ Parâmetros:
 @drawer pin=2 on=120 off=240
 ```
 
-Parâmetros:
+Parameters:
 
-- `pin`: `2` (default) ou `5`
+- `pin`: `2` (default) or `5`
 - `on`: `0..255` (default `120`)
 - `off`: `0..255` (default `240`)
 
-### Regras de parsing e validação
+### Parsing and validation rules
 
-- `@endrow` sem `@row` gera erro.
-- Bloco `@row` sem `@endrow` gera erro.
-- Dentro de `@row`, somente `@col` e `@endrow` são permitidos.
-- Aspas não fechadas em comando geram `TemplateParseException`.
-- Tipo/intervalo inválido de atributo gera `TemplateValidationException`.
+- `@endrow` without `@row` throws an error
+- `@row` block without `@endrow` throws an error
+- inside `@row`, only `@col` and `@endrow` are allowed
+- unclosed quotes throw `TemplateParseException`
+- invalid attribute type/range throws `TemplateValidationException`
 
-## Mustache suportado no template
+## Mustache support in templates
 
-### Variáveis simples
+### Simple variables
 
 ```text
 {{store}}
@@ -355,7 +367,7 @@ Parâmetros:
 {{items.0.price}}
 ```
 
-### Repetição
+### Loop
 
 ```text
 {{#each items}}
@@ -363,7 +375,7 @@ Parâmetros:
 {{/each}}
 ```
 
-### Condição
+### Condition
 
 ```text
 {{#if shouldCut}}
@@ -371,19 +383,19 @@ Parâmetros:
 {{/if}}
 ```
 
-`#if` considera verdadeiro:
+`#if` evaluates to true for:
 
 - `bool == true`
-- número diferente de `0`
-- `String` não vazia
-- `Iterable`/`Map` não vazio
+- non-zero number
+- non-empty `String`
+- non-empty `Iterable`/`Map`
 
-Não suportado no momento:
+Not supported yet:
 
 - `{{else}}`
-- helpers custom
+- custom helpers
 
-## Exemplo completo com template string
+## Full template string example
 
 ```dart
 import 'package:escpos_printer/escpos_printer.dart';
@@ -393,11 +405,11 @@ final client = EscPosClient();
 await client.connect(const WifiEndpoint('192.168.0.50', port: 9100));
 
 final template = ReceiptTemplate.dsl((b) {
-  b.text('MINHA LOJA', align: TextAlign.center, bold: true);
-  b.textTemplate('Cliente: {{name}}', vars: {'name': 'Ana'});
+  b.text('MY STORE', align: TextAlign.center, bold: true);
+  b.textTemplate('Customer: {{name}}', vars: {'name': 'Ana'});
   b.templateBlock('''
 @row
-  @col flex=2 Produto
+  @col flex=2 Product
   @col flex=1 align=right {{price}}
 @endrow
 @qrcode size=5 {{pix}}
@@ -413,7 +425,7 @@ await client.print(template: template);
 await client.disconnect();
 ```
 
-Exemplo direto com `printFromString`:
+Direct `printFromString` example:
 
 ```dart
 await client.printFromString(
@@ -430,19 +442,19 @@ await client.printFromString(
 {{/if}}
 ''',
   variables: {
-    'store': 'Mercadinho',
+    'store': 'Market',
     'items': [
-      {'name': 'Cafe', 'price': '9,90'},
-      {'name': 'Pao', 'price': '2,50'},
+      {'name': 'Coffee', 'price': '9,90'},
+      {'name': 'Bread', 'price': '2,50'},
     ],
     'shouldCut': true,
   },
 );
 ```
 
-## Search de impressoras
+## Printer discovery
 
-### API pública
+### Public API
 
 ```dart
 Future<List<DiscoveredPrinter>> searchPrinters({
@@ -452,30 +464,30 @@ Future<List<DiscoveredPrinter>> searchPrinters({
 
 ### `PrinterDiscoveryOptions`
 
-- `transports`: conjunto de transportes para buscar.
-  Default: `{DiscoveryTransport.wifi, DiscoveryTransport.usb, DiscoveryTransport.bluetooth}`
-- `timeout`: timeout global da busca (default `8s`).
-- `wifiPort`: porta TCP para probe Wi-Fi (default `9100`).
-- `wifiHostTimeout`: timeout por host Wi-Fi (default `250ms`).
-- `wifiMaxConcurrentHosts`: limite de probes concorrentes (default `64`).
-- `wifiCidrs`: lista de CIDRs para scan Wi-Fi.
-  Se vazio, a lib detecta interfaces IPv4 locais e usa `/24`.
+- `transports`: set of transports to search
+  - default: `{DiscoveryTransport.wifi, DiscoveryTransport.usb, DiscoveryTransport.bluetooth}`
+- `timeout`: global discovery timeout (default `8s`)
+- `wifiPort`: TCP port for Wi-Fi probing (default `9100`)
+- `wifiHostTimeout`: per-host timeout for Wi-Fi probes (default `250ms`)
+- `wifiMaxConcurrentHosts`: concurrent Wi-Fi probe limit (default `64`)
+- `wifiCidrs`: list of CIDRs to scan over Wi-Fi
+  - if empty, local IPv4 interfaces are detected and `/24` ranges are used
 
 ### `DiscoveredPrinter`
 
-Campos principais:
+Main fields:
 
 - `id`
 - `name`
 - `transport` (`wifi`, `usb`, `bluetooth`)
-- `endpoint` (pronto para `client.connect(...)`)
+- `endpoint` (ready for `client.connect(...)`)
 - `vendorId`, `productId`
 - `comPort`, `serialNumber`
 - `address`, `host`
 - `isPaired`
 - `metadata`
 
-### Exemplo completo
+### Complete example
 
 ```dart
 final client = EscPosClient();
@@ -499,62 +511,62 @@ for (final printer in printers) {
 if (printers.isNotEmpty) {
   await client.connect(printers.first.endpoint);
   await client.printFromString(
-    template: '@text Teste de descoberta\\n@cut mode=partial',
+    template: '@text Discovery test\\n@cut mode=partial',
     variables: const {},
   );
   await client.disconnect();
 }
 ```
 
-### Comportamento por plataforma/transporte
+### Platform/transport behavior
 
-- Wi-Fi: varredura de sub-rede local com probe TCP na porta configurada (`9100` por default).
-- Bluetooth: busca de dispositivos Classic pareados (sem BLE nesta fase).
+- Wi-Fi: local subnet scan with TCP probe on the configured port (`9100` by default)
+- Bluetooth: paired Classic devices only (BLE out of scope in this phase)
 - USB:
-  - Android/Linux: discovery por `vendorId/productId` (quando disponível, também serial/interface).
-  - macOS: discovery de devices seriais (`/dev/cu.*`, `/dev/tty.*`) com enriquecimento `VID/PID` quando disponível.
-  - Windows: discovery de COM + `VID/PID` no mesmo resultado.
+  - Android/Linux: discovery by `vendorId/productId` (when available, also serial/interface)
+  - macOS: serial device discovery (`/dev/cu.*`, `/dev/tty.*`) with `VID/PID` enrichment when available
+  - Windows: COM + `VID/PID` in the same result
 
-### Observações importantes
+### Important notes
 
-- Discovery é `best effort`: falha de um transporte não derruba o resultado dos outros.
-- No Windows, para USB, a conexão aceita:
-  - `serialNumber`/`COM` diretamente
-  - ou `vendorId + productId` com resolução de COM quando possível.
+- Discovery is `best effort`: a transport failure does not cancel other transport results
+- On Windows, USB connection accepts:
+  - direct `serialNumber`/`COM`
+  - or `vendorId + productId` with COM resolution when possible
 
-## Observações de transporte
+## Transport notes
 
-- `Wi-Fi` possui implementação padrão em Dart via socket TCP (`9100`).
-- `USB` e `Bluetooth` usam contrato tipado (`escpos_printer_platform_interface`) sobre canal nativo (`escpos_printer/native_transport`) e já estão ligados no `DefaultTransportFactory`.
-- Android: implementação nativa de sessão/`write` para USB (`UsbManager`) e Bluetooth Classic (`BluetoothSocket` RFCOMM).
-- Linux: implementação nativa para USB (`libusb`) e Bluetooth Classic (`BlueZ RFCOMM`).
-- macOS: Bluetooth Classic via `IOBluetooth` e USB via device file (`serialNumber` deve receber caminho `/dev/...`).
-- Windows: Bluetooth Classic RFCOMM (canal 1) e USB/serial via device path (`serialNumber`, ex: `COM3`).
+- `Wi-Fi` has a default Dart implementation over raw TCP (`9100`)
+- `USB` and `Bluetooth` use a typed contract (`escpos_printer_platform_interface`) over native channel (`escpos_printer/native_transport`) and are wired in `DefaultTransportFactory`
+- Android: native USB (`UsbManager`) and Bluetooth Classic (`BluetoothSocket` RFCOMM)
+- Linux: native USB (`libusb`) and Bluetooth Classic (`BlueZ RFCOMM`)
+- macOS: Bluetooth Classic via `IOBluetooth` and USB via device file (`serialNumber` must be `/dev/...`)
+- Windows: Bluetooth Classic RFCOMM (channel 1) and USB/serial via device path (`serialNumber`, e.g. `COM3`)
 
-## Pré-requisitos por plataforma
+## Platform prerequisites
 
-- Linux/Raspberry: instalar dependências de build/runtime (`libusb-1.0` e `bluez`).
-- macOS: permitir Bluetooth no app host quando necessário.
-- Windows: para USB/serial, o endpoint deve apontar para porta/handle acessível (ex: `COM3`).
+- Linux/Raspberry: install build/runtime dependencies (`libusb-1.0` and `bluez`)
+- macOS: grant Bluetooth access in the host app when needed
+- Windows: for USB/serial, endpoint must point to an accessible port/handle (for example `COM3`)
 
-## Status da impressora
+## Printer status
 
-### API de status
+### Status API
 
 - `Future<PrinterStatus> getStatus()`
-- `PrintResult.status` (retornado em `print`, `printFromString` e `printOnce`)
-- `EscPosClient.transportCapabilities` (capabilities da sessão atual)
-- `EscPosClient.transportSessionId` (id da sessão nativa atual)
+- `PrintResult.status` (returned by `print`, `printFromString`, and `printOnce`)
+- `EscPosClient.transportCapabilities` (current session capabilities)
+- `EscPosClient.transportSessionId` (current native session ID)
 
-### Modelo de retorno (`PrinterStatus`)
+### Return model (`PrinterStatus`)
 
-Todos os campos são `TriState`:
+All fields use `TriState`:
 
 - `TriState.yes`
 - `TriState.no`
 - `TriState.unknown`
 
-Campos:
+Fields:
 
 - `paperOut`
 - `paperNearEnd`
@@ -563,13 +575,13 @@ Campos:
 - `offline`
 - `drawerSignal`
 
-### Comportamento por transporte
+### Behavior by transport
 
-- O status é `best effort`.
-- Se o transporte/plataforma não suportar status em tempo real, os campos retornam `unknown`.
-- Se `getStatus()` falhar internamente por erro de driver/canal, o client também retorna `PrinterStatus.unknown()`.
+- Status is `best effort`
+- If real-time status is unsupported on a transport/platform, fields return `unknown`
+- If `getStatus()` fails due to driver/channel issues, client returns `PrinterStatus.unknown()`
 
-### Exemplo 1: consultar status após conectar
+### Example 1: query status after connect
 
 ```dart
 final client = EscPosClient();
@@ -579,40 +591,40 @@ final capabilities = client.transportCapabilities;
 if (capabilities?.supportsRealtimeStatus == true) {
   final status = await client.getStatus();
   if (status.paperOut == TriState.yes) {
-    print('Impressora sem papel');
+    print('Printer is out of paper');
   }
 } else {
-  print('Status em tempo real indisponivel nesta sessao');
+  print('Realtime status is not available for this session');
 }
 ```
 
-### Exemplo 2: ler status do resultado da impressão
+### Example 2: read status from print result
 
 ```dart
 final result = await client.printFromString(
-  template: '@text Pedido OK\n@cut mode=partial',
+  template: '@text Order OK\n@cut mode=partial',
   variables: const {},
 );
 
-print('Bytes enviados: ${result.bytesSent}');
-print('Duracao: ${result.duration.inMilliseconds} ms');
+print('Bytes sent: ${result.bytesSent}');
+print('Duration: ${result.duration.inMilliseconds} ms');
 print('PaperOut: ${result.status.paperOut}');
 print('PaperNearEnd: ${result.status.paperNearEnd}');
 ```
 
-## Erros de template
+## Template errors
 
-- Variável ausente: `TemplateRenderException`
-- Comando inválido: `TemplateParseException`
-- Valor/atributo inválido: `TemplateValidationException`
+- Missing variable: `TemplateRenderException`
+- Invalid command: `TemplateParseException`
+- Invalid value/attribute: `TemplateValidationException`
 
-## Testes
+## Tests
 
 ```bash
 flutter test --no-pub
 ```
 
-## Endpoints suportados na API
+## Supported API endpoints
 
 ```dart
 const wifi = WifiEndpoint('192.168.0.50', port: 9100);

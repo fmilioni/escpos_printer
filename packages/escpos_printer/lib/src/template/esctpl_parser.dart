@@ -24,7 +24,7 @@ final class EscTplParser {
 
       if (!line.startsWith('@')) {
         throw TemplateParseException(
-          'Linha invalida: "$line". Esperado comando iniciado por @.',
+          'Invalid line: "$line". Expected a command starting with @.',
         );
       }
 
@@ -50,7 +50,7 @@ final class EscTplParser {
 
             if (!candidate.startsWith('@col')) {
               throw TemplateParseException(
-                'Somente @col e @endrow sao permitidos dentro de @row. Recebido: "$candidate".',
+                'Only @col and @endrow are allowed inside @row. Received: "$candidate".',
               );
             }
 
@@ -59,11 +59,11 @@ final class EscTplParser {
           }
 
           if (!foundEnd) {
-            throw TemplateParseException('Bloco @row sem fechamento @endrow.');
+            throw TemplateParseException('@row block without @endrow closing.');
           }
           if (rowColumns.isEmpty) {
             throw TemplateValidationException(
-              '@row precisa de ao menos uma coluna @col.',
+              '@row requires at least one @col column.',
             );
           }
 
@@ -71,7 +71,7 @@ final class EscTplParser {
 
         case 'endrow':
           throw TemplateParseException(
-            '@endrow sem bloco @row correspondente.',
+            '@endrow without a matching @row block.',
           );
 
         case 'text':
@@ -155,7 +155,7 @@ final class EscTplParser {
             'partial' => CutMode.partial,
             'full' => CutMode.full,
             _ => throw TemplateValidationException(
-              'Modo de corte invalido: $modeRaw. Use partial ou full.',
+              'Invalid cut mode: $modeRaw. Use partial or full.',
             ),
           };
           ops.add(CutOp(mode));
@@ -166,7 +166,7 @@ final class EscTplParser {
             '2' => DrawerPin.pin2,
             '5' => DrawerPin.pin5,
             _ => throw TemplateValidationException(
-              'Pin invalido para drawer: $pinRaw. Use 2 ou 5.',
+              'Invalid drawer pin: $pinRaw. Use 2 or 5.',
             ),
           };
           ops.add(
@@ -190,9 +190,7 @@ final class EscTplParser {
           );
 
         default:
-          throw TemplateParseException(
-            'Comando nao suportado: @${command.name}',
-          );
+          throw TemplateParseException('Unsupported command: @${command.name}');
       }
     }
 
@@ -244,7 +242,7 @@ final class EscTplParser {
       return data;
     }
     throw TemplateValidationException(
-      '@$label precisa de conteudo ou atributo data=.',
+      '@$label requires content or a data= attribute.',
     );
   }
 
@@ -252,7 +250,7 @@ final class EscTplParser {
     try {
       return Uint8List.fromList(base64Decode(content));
     } catch (error) {
-      throw TemplateValidationException('Base64 invalido em @image.', error);
+      throw TemplateValidationException('Invalid base64 in @image.', error);
     }
   }
 
@@ -263,7 +261,7 @@ final class EscTplParser {
       'center' => TextAlign.center,
       'right' => TextAlign.right,
       _ => throw TemplateValidationException(
-        'Alinhamento invalido: $value. Use left, center ou right.',
+        'Invalid alignment: $value. Use left, center, or right.',
       ),
     };
   }
@@ -274,7 +272,7 @@ final class EscTplParser {
       'a' => FontType.a,
       'b' => FontType.b,
       _ => throw TemplateValidationException(
-        'Fonte invalida: $value. Use a ou b.',
+        'Invalid font: $value. Use a or b.',
       ),
     };
   }
@@ -288,9 +286,7 @@ final class EscTplParser {
       'ean8' => BarcodeType.ean8,
       'code39' => BarcodeType.code39,
       'code128' => BarcodeType.code128,
-      _ => throw TemplateValidationException(
-        'Tipo de barcode invalido: $value.',
-      ),
+      _ => throw TemplateValidationException('Invalid barcode type: $value.'),
     };
   }
 
@@ -315,7 +311,7 @@ final class EscTplParser {
         return defaultValue;
       }
       throw TemplateValidationException(
-        'Atributo obrigatorio ausente: $name em @${command.name}.',
+        'Missing required attribute: $name in @${command.name}.',
       );
     }
     return _parseInt(
@@ -338,7 +334,7 @@ final class EscTplParser {
       if (defaultValue != null) {
         return defaultValue;
       }
-      throw TemplateValidationException('Atributo obrigatorio ausente: $name.');
+      throw TemplateValidationException('Missing required attribute: $name.');
     }
     return _parseInt(raw, name: name, min: min, max: max);
   }
@@ -346,16 +342,16 @@ final class EscTplParser {
   int _parseInt(String raw, {required String name, int? min, int? max}) {
     final value = int.tryParse(raw.trim());
     if (value == null) {
-      throw TemplateValidationException('Valor invalido para $name: "$raw".');
+      throw TemplateValidationException('Invalid value for $name: "$raw".');
     }
     if (min != null && value < min) {
       throw TemplateValidationException(
-        'Valor de $name deve ser >= $min. Recebido: $value.',
+        'Value for $name must be >= $min. Received: $value.',
       );
     }
     if (max != null && value > max) {
       throw TemplateValidationException(
-        'Valor de $name deve ser <= $max. Recebido: $value.',
+        'Value for $name must be <= $max. Received: $value.',
       );
     }
     return value;
@@ -364,13 +360,13 @@ final class EscTplParser {
   _Command _parseCommandLine(String rawLine) {
     final trimmed = rawLine.trim();
     if (!trimmed.startsWith('@')) {
-      throw TemplateParseException('Comando invalido: "$rawLine"');
+      throw TemplateParseException('Invalid command: "$rawLine"');
     }
 
     final body = trimmed.substring(1);
     final tokens = _tokenize(body);
     if (tokens.isEmpty) {
-      throw TemplateParseException('Comando vazio: "$rawLine"');
+      throw TemplateParseException('Empty command: "$rawLine"');
     }
 
     final name = tokens.first.toLowerCase();
@@ -385,7 +381,7 @@ final class EscTplParser {
         final key = token.substring(0, separator).trim();
         final value = token.substring(separator + 1).trim();
         if (key.isEmpty) {
-          throw TemplateParseException('Atributo invalido em "$rawLine".');
+          throw TemplateParseException('Invalid attribute in "$rawLine".');
         }
         attrs[key] = _stripQuotes(value);
         continue;

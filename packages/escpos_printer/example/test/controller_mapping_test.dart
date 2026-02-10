@@ -3,7 +3,7 @@ import 'package:escpos_printer_example/src/demo_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('mapeia draft Wi-Fi para WifiEndpoint', () {
+  test('maps Wi-Fi draft to WifiEndpoint', () {
     final endpoint = const ManualConnectionDraft(
       mode: ManualConnectionMode.wifi,
       wifiHost: '192.168.0.10',
@@ -16,7 +16,7 @@ void main() {
     expect(wifi.port, 9100);
   });
 
-  test('mapeia draft USB VID/PID aceitando hexadecimal', () {
+  test('maps USB VID/PID draft allowing hexadecimal', () {
     final endpoint = const ManualConnectionDraft(
       mode: ManualConnectionMode.usbVidPid,
       usbVendorId: '0x04B8',
@@ -31,7 +31,7 @@ void main() {
     expect(usb.interfaceNumber, 1);
   });
 
-  test('mapeia draft USB serial/path com VID/PID opcionais', () {
+  test('maps USB serial/path draft with optional VID/PID', () {
     final endpoint = const ManualConnectionDraft(
       mode: ManualConnectionMode.usbSerial,
       usbSerialPath: 'COM4',
@@ -46,7 +46,7 @@ void main() {
     expect(usb.productId, 3605);
   });
 
-  test('mapeia draft Bluetooth para endpoint classic/ble', () {
+  test('maps Bluetooth draft to classic/ble endpoint', () {
     final endpoint = const ManualConnectionDraft(
       mode: ManualConnectionMode.bluetooth,
       bluetoothAddress: 'AA:BB:CC:DD:EE:FF',
@@ -61,7 +61,7 @@ void main() {
     expect(bluetooth.serviceUuid, '00001101-0000-1000-8000-00805F9B34FB');
   });
 
-  test('lanca FormatException para campos obrigatorios invalidos', () {
+  test('throws FormatException for invalid required fields', () {
     expect(
       () => const ManualConnectionDraft(
         mode: ManualConnectionMode.wifi,
@@ -81,7 +81,7 @@ void main() {
     );
   });
 
-  test('parseCidrsInput separa por virgula, espaco e quebra de linha', () {
+  test('parseCidrsInput splits by comma, space, and newline', () {
     final cidrs = ManualConnectionDraft.parseCidrsInput(
       '192.168.0.0/24,10.0.0.0/24\n172.16.0.0/24',
     );

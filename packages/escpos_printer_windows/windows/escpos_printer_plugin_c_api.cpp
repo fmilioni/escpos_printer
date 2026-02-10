@@ -1,8 +1,8 @@
-#include "include/escpos_printer/escpos_printer_plugin_c_api.h"
+#include "include/escpos_printer_windows/escpos_printer_plugin_c_api.h"
 
 #include <flutter/plugin_registrar_windows.h>
 
-#include "include/escpos_printer/escpos_printer_plugin.h"
+#include "include/escpos_printer_windows/escpos_printer_plugin.h"
 
 void EscposPrinterPluginCApiRegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar)
 {

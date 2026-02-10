@@ -276,7 +276,7 @@ final class OpenConnectionResponse {
     if (rawSessionId is! String || rawSessionId.isEmpty) {
       throw PlatformException(
         code: 'invalid_response',
-        message: 'sessionId ausente na resposta de openConnection.',
+        message: 'Missing sessionId in openConnection response.',
       );
     }
 
@@ -301,7 +301,7 @@ final class OpenConnectionResponse {
   }
 }
 
-/// Contrato tipado de host API (implementação compatível com MethodChannel).
+/// Typed host API contract (MethodChannel-compatible implementation).
 class NativeTransportApi {
   NativeTransportApi({MethodChannel? channel})
     : _channel =
@@ -319,7 +319,7 @@ class NativeTransportApi {
     if (raw == null) {
       throw PlatformException(
         code: 'invalid_response',
-        message: 'Resposta vazia para openConnection.',
+        message: 'Empty response for openConnection.',
       );
     }
 

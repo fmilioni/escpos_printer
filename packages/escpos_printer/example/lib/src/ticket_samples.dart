@@ -31,14 +31,14 @@ final class DemoTicketData {
 
 DemoTicketData defaultDemoTicketData() {
   return DemoTicketData(
-    store: 'Loja Exemplo ESC/POS',
-    customer: 'Cliente Demo',
+    store: 'ESC/POS Example Store',
+    customer: 'Demo Customer',
     items: const <DemoTicketItem>[
-      DemoTicketItem(name: 'Cafe', price: '9,90'),
-      DemoTicketItem(name: 'Pao de queijo', price: '6,50'),
-      DemoTicketItem(name: 'Suco', price: '7,00'),
+      DemoTicketItem(name: 'Coffee', price: '9.90'),
+      DemoTicketItem(name: 'Cheese bread', price: '6.50'),
+      DemoTicketItem(name: 'Juice', price: '7.00'),
     ],
-    total: '23,40',
+    total: '23.40',
     pixPayload:
         '00020101021226890014br.gov.bcb.pix2567pix.exemplo.com/qr/abc123520400005303986540523.405802BR5925LOJA EXEMPLO ESCPOS6009SAO PAULO62070503***6304A1B2',
     barcodeValue: '123456789012',
@@ -64,7 +64,7 @@ List<DemoTicketItem> parseDemoItems(String raw) {
       continue;
     }
 
-    items.add(DemoTicketItem(name: trimmed, price: '0,00'));
+    items.add(DemoTicketItem(name: trimmed, price: '0.00'));
   }
 
   if (items.isEmpty) {
@@ -104,17 +104,21 @@ ReceiptTemplate buildDslTicketTemplate(
       heightScale: 2,
       align: TextAlign.center,
     );
-    b.text('Cliente: ${data.customer}', underline: true, align: TextAlign.left);
-    b.text('DEMO INVERTIDO', invert: true, align: TextAlign.center);
     b.text(
-      'Fonte B 2x1',
+      'Customer: ${data.customer}',
+      underline: true,
+      align: TextAlign.left,
+    );
+    b.text('INVERTED DEMO', invert: true, align: TextAlign.center);
+    b.text(
+      'Font B 2x1',
       font: FontType.b,
       widthScale: 2,
       heightScale: 1,
       align: TextAlign.left,
     );
     b.textTemplate(
-      'Total parcial: {{total}}',
+      'Subtotal: {{total}}',
       vars: <String, Object?>{'total': data.total},
       bold: true,
       align: TextAlign.right,
@@ -122,7 +126,7 @@ ReceiptTemplate buildDslTicketTemplate(
 
     b.row(<RowColumnSpec>[
       b.col('Item', flex: 3, bold: true),
-      b.col('Valor', flex: 1, align: TextAlign.right, bold: true),
+      b.col('Price', flex: 1, align: TextAlign.right, bold: true),
     ]);
 
     for (final item in data.items) {
@@ -160,12 +164,12 @@ ReceiptTemplate buildDslTicketTemplate(
 String buildEscTplTicketString({required SampleRasterImage image}) {
   return '''
 @text align=center bold=true width=2 height=2 {{store}}
-@text underline=true Cliente: {{customer}}
-@text invert=true align=center DEMO INVERTIDO
-@text font=b width=2 height=1 Fonte B 2x1
+@text underline=true Customer: {{customer}}
+@text invert=true align=center INVERTED DEMO
+@text font=b width=2 height=1 Font B 2x1
 @row
   @col flex=3 bold=true Item
-  @col flex=1 align=right bold=true Valor
+  @col flex=1 align=right bold=true Price
 @endrow
 {{#each items}}
 @row
@@ -198,16 +202,16 @@ ReceiptTemplate buildHybridTicketTemplate(
   };
 
   return ReceiptTemplate.dsl((b) {
-    b.text('TICKET HIBRIDO', bold: true, align: TextAlign.center);
+    b.text('HYBRID TICKET', bold: true, align: TextAlign.center);
     b.textTemplate(
-      'Loja: {{store}}',
+      'Store: {{store}}',
       vars: <String, Object?>{'store': data.store},
       underline: true,
     );
     b.templateBlock('''
 @row
   @col flex=3 bold=true Item
-  @col flex=1 align=right bold=true Valor
+  @col flex=1 align=right bold=true Price
 @endrow
 {{#each items}}
 @row

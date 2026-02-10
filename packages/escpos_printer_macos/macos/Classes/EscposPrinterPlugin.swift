@@ -58,7 +58,7 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
 
   private func parseArgs(_ raw: Any?) throws -> [String: Any] {
     guard let args = raw as? [String: Any] else {
-      throw NativeTransportError.invalidArgs("Payload deve ser um map")
+      throw NativeTransportError.invalidArgs("Payload must be a map")
     }
     return args
   }
@@ -91,11 +91,11 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
         connection = try UsbDeviceFileConnection(serialOrPath: resolvedPath)
       } else {
         throw NativeTransportError.invalidArgs(
-          "Para USB informe serialNumber/path ou vendorId+productId válidos"
+          "For USB, provide serialNumber/path or valid vendorId+productId"
         )
       }
     default:
-      throw NativeTransportError.invalidArgs("Transporte nao suportado: \(transport)")
+      throw NativeTransportError.invalidArgs("Unsupported transport: \(transport)")
     }
 
     let sessionId = UUID().uuidString
@@ -110,11 +110,11 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
   private func handleWrite(payload: [String: Any]) throws {
     let sessionId = try requiredString(payload, key: "sessionId")
     guard let connection = sessions[sessionId] else {
-      throw NativeTransportError.invalidSession("Sessao nao encontrada")
+      throw NativeTransportError.invalidSession("Session not found")
     }
 
     guard let typedBytes = payload["bytes"] as? FlutterStandardTypedData else {
-      throw NativeTransportError.invalidArgs("Campo bytes deve ser Uint8List")
+      throw NativeTransportError.invalidArgs("bytes field must be Uint8List")
     }
 
     try connection.write(typedBytes.data)
@@ -123,7 +123,7 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
   private func handleReadStatus(payload: [String: Any]) throws -> [String: String] {
     let sessionId = try requiredString(payload, key: "sessionId")
     guard let connection = sessions[sessionId] else {
-      throw NativeTransportError.invalidSession("Sessao nao encontrada")
+      throw NativeTransportError.invalidSession("Session not found")
     }
 
     return connection.readStatus()
@@ -140,7 +140,7 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
   private func handleGetCapabilities(payload: [String: Any]) throws -> [String: Any] {
     let sessionId = try requiredString(payload, key: "sessionId")
     guard let connection = sessions[sessionId] else {
-      throw NativeTransportError.invalidSession("Sessao nao encontrada")
+      throw NativeTransportError.invalidSession("Session not found")
     }
 
     return ["capabilities": connection.capabilities()]
@@ -159,7 +159,7 @@ public class EscposPrinterPlugin: NSObject, FlutterPlugin {
 
   private func requiredString(_ payload: [String: Any], key: String) throws -> String {
     guard let value = payload[key] as? String, !value.isEmpty else {
-      throw NativeTransportError.invalidArgs("Campo obrigatorio ausente: \(key)")
+      throw NativeTransportError.invalidArgs("Missing required field: \(key)")
     }
     return value
   }
@@ -261,7 +261,7 @@ private final class WifiNativeConnection: NativeConnection {
     _ = readStream
 
     guard let stream = writeStream?.takeRetainedValue() as OutputStream? else {
-      throw NativeTransportError.connectFailed("Falha ao criar stream TCP")
+      throw NativeTransportError.connectFailed("Failed to create TCP stream")
     }
 
     self.stream = stream
@@ -269,7 +269,7 @@ private final class WifiNativeConnection: NativeConnection {
 
     if self.stream.streamStatus == .error || self.stream.streamStatus == .closed {
       throw NativeTransportError.connectFailed(
-        self.stream.streamError?.localizedDescription ?? "Falha ao abrir stream TCP"
+        self.stream.streamError?.localizedDescription ?? "Failed to open TCP stream"
       )
     }
   }
@@ -286,7 +286,7 @@ private final class WifiNativeConnection: NativeConnection {
                                  maxLength: data.count - totalWritten)
         if wrote <= 0 {
           throw NativeTransportError.writeFailed(
-            stream.streamError?.localizedDescription ?? "Falha ao escrever em stream TCP"
+            stream.streamError?.localizedDescription ?? "Failed to write to TCP stream"
           )
         }
         totalWritten += wrote
@@ -313,19 +313,19 @@ private final class BluetoothNativeConnection: NativeConnection {
 
   init(address: String, serviceUuid: String?) throws {
     guard let device = IOBluetoothDevice(addressString: address) else {
-      throw NativeTransportError.invalidArgs("Endereco Bluetooth invalido")
+      throw NativeTransportError.invalidArgs("Invalid Bluetooth address")
     }
 
     let channelID: BluetoothRFCOMMChannelID = 1
     if let serviceUuid, !serviceUuid.isEmpty {
-      // `serviceUuid` reservado para extensao futura; por compatibilidade SPP usamos canal 1.
+      // `serviceUuid` is reserved for future extensions; for SPP compatibility we use channel 1.
       _ = serviceUuid
     }
 
     var channelRef: IOBluetoothRFCOMMChannel?
     let openStatus = device.openRFCOMMChannelSync(&channelRef, withChannelID: channelID, delegate: nil)
     guard openStatus == kIOReturnSuccess, let channel = channelRef else {
-      throw NativeTransportError.connectFailed("Falha ao abrir canal RFCOMM")
+      throw NativeTransportError.connectFailed("Failed to open RFCOMM channel")
     }
 
     self.device = device
@@ -344,7 +344,7 @@ private final class BluetoothNativeConnection: NativeConnection {
     }
 
     guard status == kIOReturnSuccess else {
-      throw NativeTransportError.writeFailed("Falha ao enviar bytes via RFCOMM")
+      throw NativeTransportError.writeFailed("Failed to send bytes over RFCOMM")
     }
   }
 
@@ -375,7 +375,7 @@ private final class UsbDeviceFileConnection: NativeConnection {
 
     let fd = Darwin.open(path, O_WRONLY | O_NOCTTY)
     guard fd >= 0 else {
-      throw NativeTransportError.connectFailed("Falha ao abrir dispositivo USB em \(path)")
+      throw NativeTransportError.connectFailed("Failed to open USB device at \(path)")
     }
 
     self.fileDescriptor = fd
@@ -393,7 +393,7 @@ private final class UsbDeviceFileConnection: NativeConnection {
                                  baseAddress.advanced(by: totalWritten),
                                  data.count - totalWritten)
         if wrote < 0 {
-          throw NativeTransportError.writeFailed("Falha ao enviar bytes no dispositivo USB")
+          throw NativeTransportError.writeFailed("Failed to send bytes to USB device")
         }
         totalWritten += wrote
       }

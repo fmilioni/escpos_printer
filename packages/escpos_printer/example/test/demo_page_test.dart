@@ -6,93 +6,91 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('renderiza secoes principais no layout vertical', (tester) async {
+  testWidgets('renders main sections in vertical layout', (tester) async {
     final controller = FakeDemoController();
 
     await tester.pumpWidget(
       MaterialApp(home: DemoPage(controller: controller)),
     );
 
-    expect(find.text('1) Sessao atual'), findsOneWidget);
-    expect(find.text('2) Busca de impressoras'), findsOneWidget);
+    expect(find.text('1) Current session'), findsOneWidget);
+    expect(find.text('2) Printer search'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('3) Conexao manual'),
+      find.text('3) Manual connection'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('3) Conexao manual'), findsOneWidget);
+    expect(find.text('3) Manual connection'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('4) Status e comandos diretos'),
+      find.text('4) Status and quick commands'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('4) Status e comandos diretos'), findsOneWidget);
+    expect(find.text('4) Status and quick commands'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('5) Imprimir ticket de exemplo'),
+      find.text('5) Print sample ticket'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('5) Imprimir ticket de exemplo'), findsOneWidget);
-    expect(find.text('Largura do papel'), findsOneWidget);
+    expect(find.text('5) Print sample ticket'), findsOneWidget);
+    expect(find.text('Paper width'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('6) Log de execucao'),
+      find.text('6) Execution log'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('6) Log de execucao'), findsOneWidget);
+    expect(find.text('6) Execution log'), findsOneWidget);
   });
 
-  testWidgets('aciona callbacks principais da tela', (tester) async {
+  testWidgets('triggers main page callbacks', (tester) async {
     final controller = FakeDemoController();
 
     await tester.pumpWidget(
       MaterialApp(home: DemoPage(controller: controller)),
     );
 
-    await tester.ensureVisible(find.text('Buscar impressoras'));
-    await tester.tap(find.text('Buscar impressoras'));
+    await tester.ensureVisible(find.text('Search printers'));
+    await tester.tap(find.text('Search printers'));
     await tester.pump();
     expect(controller.searchCalls, 1);
 
     await tester.scrollUntilVisible(
-      find.text('Conectar manual'),
+      find.text('Connect manually'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.ensureVisible(find.text('Conectar manual'));
+    await tester.ensureVisible(find.text('Connect manually'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Conectar manual'));
+    await tester.tap(find.text('Connect manually'));
     await tester.pump();
     expect(controller.connectManualCalls, 1);
 
     await tester.scrollUntilVisible(
-      find.text('Imprimir ticket (DSL completo)'),
+      find.text('Print ticket (full DSL)'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.ensureVisible(find.text('Imprimir ticket (DSL completo)'));
+    await tester.ensureVisible(find.text('Print ticket (full DSL)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Imprimir ticket (DSL completo)'));
+    await tester.tap(find.text('Print ticket (full DSL)'));
     await tester.pump();
     expect(controller.printDslCalls, 1);
 
-    await tester.ensureVisible(
-      find.text('Imprimir ticket (EscTpl string completo)'),
-    );
+    await tester.ensureVisible(find.text('Print ticket (full EscTpl string)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Imprimir ticket (EscTpl string completo)'));
+    await tester.tap(find.text('Print ticket (full EscTpl string)'));
     await tester.pump();
     expect(controller.printEscTplCalls, 1);
 
     await tester.ensureVisible(
-      find.text('Imprimir ticket (Hibrido DSL+templateBlock)'),
+      find.text('Print ticket (Hybrid DSL+templateBlock)'),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Imprimir ticket (Hibrido DSL+templateBlock)'));
+    await tester.tap(find.text('Print ticket (Hybrid DSL+templateBlock)'));
     await tester.pump();
     expect(controller.printHybridCalls, 1);
   });

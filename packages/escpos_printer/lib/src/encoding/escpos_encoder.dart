@@ -6,16 +6,23 @@ import '../model/options.dart';
 import '../template/operations.dart';
 
 final class EscPosEncoder {
-  const EscPosEncoder({this.paperWidthChars = 48})
-    : assert(paperWidthChars > 0);
+  const EscPosEncoder({
+    this.paperWidthChars = 48,
+    this.codeTable = EscPosCodeTable.wcp1252,
+  }) : assert(paperWidthChars > 0);
 
   final int paperWidthChars;
+  final EscPosCodeTable? codeTable;
 
   List<int> encode(List<PrintOp> ops, {bool initializePrinter = true}) {
     final bytes = <int>[];
 
     if (initializePrinter) {
       bytes.addAll(const <int>[0x1B, 0x40]);
+      final selectedCodeTable = codeTable;
+      if (selectedCodeTable != null) {
+        bytes.addAll(<int>[0x1B, 0x74, selectedCodeTable.value]);
+      }
     }
 
     for (final op in ops) {
@@ -93,10 +100,11 @@ final class EscPosEncoder {
     output.addAll(_latin1WithFallback(text));
     output.add(0x0A);
 
-    // Evita vazamento de estilo para o proximo bloco.
+    // Prevent style state from leaking into the next block.
     output.addAll(const <int>[0x1B, 0x45, 0]);
     output.addAll(const <int>[0x1B, 0x2D, 0]);
     output.addAll(const <int>[0x1D, 0x42, 0]);
+    output.addAll(const <int>[0x1B, 0x4D, 0]);
     output.addAll(const <int>[0x1D, 0x21, 0]);
   }
 
@@ -209,7 +217,7 @@ final class EscPosEncoder {
     final expectedLength = widthBytes * heightDots;
     if (rasterData.length != expectedLength) {
       throw TemplateValidationException(
-        'Dados de imagem invalidos. Esperado $expectedLength bytes (widthBytes * heightDots), recebido ${rasterData.length}.',
+        'Invalid image data. Expected $expectedLength bytes (widthBytes * heightDots), got ${rasterData.length}.',
       );
     }
 

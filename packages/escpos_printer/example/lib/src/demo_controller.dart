@@ -109,14 +109,14 @@ final class ManualConnectionDraft {
     return _requiredInt(raw, 'Timeout', min: 1, max: 120);
   }
 
-  static int parsePort(String raw, {String fieldName = 'Porta'}) {
+  static int parsePort(String raw, {String fieldName = 'Port'}) {
     return _requiredInt(raw, fieldName, min: 1, max: 65535);
   }
 
   static String _requiredString(String raw, String fieldName) {
     final value = raw.trim();
     if (value.isEmpty) {
-      throw FormatException('$fieldName nao pode ser vazio.');
+      throw FormatException('$fieldName cannot be empty.');
     }
     return value;
   }
@@ -124,10 +124,10 @@ final class ManualConnectionDraft {
   static int _requiredInt(String raw, String fieldName, {int? min, int? max}) {
     final parsed = _parseFlexibleInt(raw, fieldName);
     if (min != null && parsed < min) {
-      throw FormatException('$fieldName deve ser >= $min.');
+      throw FormatException('$fieldName must be >= $min.');
     }
     if (max != null && parsed > max) {
-      throw FormatException('$fieldName deve ser <= $max.');
+      throw FormatException('$fieldName must be <= $max.');
     }
     return parsed;
   }
@@ -143,7 +143,7 @@ final class ManualConnectionDraft {
   static int _parseFlexibleInt(String raw, String fieldName) {
     final value = raw.trim().toLowerCase();
     if (value.isEmpty) {
-      throw FormatException('$fieldName nao pode ser vazio.');
+      throw FormatException('$fieldName cannot be empty.');
     }
 
     final parsed = value.startsWith('0x')
@@ -151,7 +151,7 @@ final class ManualConnectionDraft {
         : int.tryParse(value);
 
     if (parsed == null) {
-      throw FormatException('$fieldName invalido: "$raw".');
+      throw FormatException('Invalid $fieldName: "$raw".');
     }
     return parsed;
   }
@@ -233,10 +233,10 @@ class DemoController extends ChangeNotifier {
         ),
       );
       _printers = found;
-      _log('Busca finalizada: ${found.length} impressora(s) encontrada(s).');
+      _log('Search finished: ${found.length} printer(s) found.');
     } catch (error) {
       _lastError = '$error';
-      _log('Erro na busca: $error');
+      _log('Search error: $error');
     } finally {
       _searching = false;
       notifyListeners();
@@ -252,7 +252,7 @@ class DemoController extends ChangeNotifier {
 
   Future<void> connectManual(ManualConnectionDraft draft) {
     final endpoint = draft.toEndpoint();
-    return connectEndpoint(endpoint, contextLabel: 'Conexao manual');
+    return connectEndpoint(endpoint, contextLabel: 'Manual connection');
   }
 
   Future<void> connectEndpoint(
@@ -270,10 +270,10 @@ class DemoController extends ChangeNotifier {
 
       await _client.connect(endpoint);
       _connectedEndpoint = endpoint;
-      _log('${contextLabel ?? 'Conectado'} em ${describeEndpoint(endpoint)}');
+      _log('${contextLabel ?? 'Connected'} to ${describeEndpoint(endpoint)}');
     } catch (error) {
       _lastError = '$error';
-      _log('Erro ao conectar: $error');
+      _log('Connection error: $error');
     } finally {
       _connecting = false;
       notifyListeners();
@@ -288,10 +288,10 @@ class DemoController extends ChangeNotifier {
     try {
       await _client.disconnect();
       _connectedEndpoint = null;
-      _log('Sessao desconectada.');
+      _log('Session disconnected.');
     } catch (error) {
       _lastError = '$error';
-      _log('Erro ao desconectar: $error');
+      _log('Disconnect error: $error');
     } finally {
       _connecting = false;
       notifyListeners();
@@ -306,10 +306,10 @@ class DemoController extends ChangeNotifier {
     try {
       final status = await _client.getStatus();
       _lastStatus = status;
-      _log('Status atualizado: ${formatTriState(status.offline)} offline.');
+      _log('Status updated: ${formatTriState(status.offline)} offline.');
     } catch (error) {
       _lastError = '$error';
-      _log('Erro ao ler status: $error');
+      _log('Read status error: $error');
     } finally {
       _readingStatus = false;
       notifyListeners();
@@ -320,15 +320,17 @@ class DemoController extends ChangeNotifier {
       _runCommand(name: 'Feed', action: () => _client.feed(1));
 
   Future<void> cutPartial() => _runCommand(
-    name: 'Corte parcial',
+    name: 'Partial cut',
     action: () => _client.cut(CutMode.partial),
   );
 
   Future<void> cutFull() =>
-      _runCommand(name: 'Corte total', action: () => _client.cut(CutMode.full));
+      _runCommand(name: 'Full cut', action: () => _client.cut(CutMode.full));
 
-  Future<void> openDrawer() =>
-      _runCommand(name: 'Abrir gaveta', action: () => _client.openCashDrawer());
+  Future<void> openDrawer() => _runCommand(
+    name: 'Open cash drawer',
+    action: () => _client.openCashDrawer(),
+  );
 
   Future<void> printDslTicket(
     DemoTicketData data, {
@@ -369,7 +371,7 @@ class DemoController extends ChangeNotifier {
     PrintOptions printOptions = const PrintOptions(paperWidthChars: 48),
   }) async {
     await _runPrint(
-      name: 'Ticket hibrido',
+      name: 'Hybrid ticket',
       action: () {
         final template = buildHybridTicketTemplate(data);
         return _client.print(
@@ -416,7 +418,7 @@ class DemoController extends ChangeNotifier {
       return '${endpoint.vendorId}:${endpoint.productId}';
     }
 
-    return 'endpoint indefinido';
+    return 'undefined endpoint';
   }
 
   Future<void> _runCommand({
@@ -429,10 +431,10 @@ class DemoController extends ChangeNotifier {
 
     try {
       await action();
-      _log('Comando executado: $name');
+      _log('Command executed: $name');
     } catch (error) {
       _lastError = '$error';
-      _log('Erro em "$name": $error');
+      _log('Error in "$name": $error');
     } finally {
       _sendingCommand = false;
       notifyListeners();
@@ -452,12 +454,12 @@ class DemoController extends ChangeNotifier {
       _lastPrintResult = result;
       _lastStatus = result.status;
       _log(
-        '$name concluido (${result.bytesSent} bytes em '
+        '$name completed (${result.bytesSent} bytes in '
         '${result.duration.inMilliseconds} ms).',
       );
     } catch (error) {
       _lastError = '$error';
-      _log('Erro em "$name": $error');
+      _log('Error in "$name": $error');
     } finally {
       _printing = false;
       notifyListeners();
@@ -481,7 +483,7 @@ class DemoController extends ChangeNotifier {
         .toList(growable: false);
 
     if (denied.isNotEmpty) {
-      throw StateError('Permissoes Bluetooth negadas: ${denied.join(', ')}');
+      throw StateError('Bluetooth permissions denied: ${denied.join(', ')}');
     }
   }
 

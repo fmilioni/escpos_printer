@@ -150,7 +150,7 @@ final class EscPosClient {
       final transport = _transport;
       if (transport == null) {
         throw ConnectionException(
-          'Nenhuma sessao ativa. Execute connect() antes de getStatus().',
+          'No active session. Call connect() before getStatus().',
         );
       }
 
@@ -189,6 +189,7 @@ final class EscPosClient {
 
     final encoder = EscPosEncoder(
       paperWidthChars: printOptions.paperWidthChars,
+      codeTable: printOptions.codeTable,
     );
     final bytes = encoder.encode(
       resolvedOps,
@@ -287,7 +288,7 @@ final class EscPosClient {
         final transport = _transport;
         if (transport == null) {
           throw ConnectionException(
-            'Nenhuma sessao ativa. Execute connect() antes de imprimir.',
+            'No active session. Call connect() before printing.',
           );
         }
 
@@ -300,7 +301,7 @@ final class EscPosClient {
       } catch (error) {
         if (attempt >= maxAttempts) {
           throw ConnectionException(
-            'Falha ao enviar dados para a impressora apos retries.',
+            'Failed to send data to the printer after retries.',
             error,
           );
         }
@@ -317,7 +318,7 @@ final class EscPosClient {
     final endpoint = _endpoint;
     if (endpoint == null) {
       throw ConnectionException(
-        'Nao e possivel reconectar sem endpoint configurado.',
+        'Cannot reconnect without a configured endpoint.',
       );
     }
 

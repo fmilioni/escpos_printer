@@ -1,14 +1,14 @@
 # escpos_printer_example
 
-App de exemplo mobile (layout vertical) para demonstrar o package `escpos_printer` com:
+Mobile example app (vertical layout) to demonstrate `escpos_printer` with:
 
-- busca de impressoras (`searchPrinters`) em Wi-Fi, USB e Bluetooth (onde suportado)
-- conexao manual em todos os endpoints suportados
-- impressao de ticket de exemplo com DSL, EscTpl string e modo hibrido
-- leitura de status e comandos diretos (`feed`, `cut`, `openCashDrawer`)
-- configuracao de largura do papel no print (`58mm` ou `80mm`, default `80mm`)
+- printer discovery (`searchPrinters`) over Wi-Fi, USB, and Bluetooth (where supported)
+- manual connection for all supported endpoints
+- sample ticket printing with DSL, EscTpl string, and hybrid mode
+- status reading and direct commands (`feed`, `cut`, `openCashDrawer`)
+- paper width selection for printing (`58mm` or `80mm`, default `80mm`)
 
-## Executar
+## Run
 
 ```bash
 cd /Users/fmilioni/Projetos/escpos_printer/packages/escpos_printer/example
@@ -16,30 +16,30 @@ flutter pub get
 flutter run
 ```
 
-## Fluxo sugerido
+## Suggested flow
 
-1. Abra a secao **Busca de impressoras** e clique em `Buscar impressoras`.
-2. Conecte por um item descoberto, ou use **Conexao manual**.
-3. Em **Status e comandos diretos**, valide `Ler status`, `Feed`, `Cut` e `Abrir gaveta`.
-4. Em **Imprimir ticket de exemplo**, teste os tres botoes de impressao:
-   - DSL completo
-   - EscTpl string completo
-   - Hibrido DSL + templateBlock
+1. Open the **Printer discovery** section and tap `Search printers`.
+2. Connect using a discovered device, or use **Manual connection**.
+3. In **Status and direct commands**, validate `Read status`, `Feed`, `Cut`, and `Open drawer`.
+4. In **Print sample ticket**, test the three print buttons:
+   - Full DSL
+   - Full EscTpl string
+   - Hybrid DSL + templateBlock
 
-## Permissoes Android
+## Android permissions
 
-O exemplo declara permissao para:
+The example declares permissions for:
 
 - `INTERNET`
 - `BLUETOOTH`, `BLUETOOTH_ADMIN`
 - `BLUETOOTH_CONNECT`, `BLUETOOTH_SCAN`
-- `android.hardware.usb.host` (feature opcional)
+- `android.hardware.usb.host` (optional feature)
 
-Durante busca/conexao Bluetooth no Android, o app solicita permissao em runtime.
+During Bluetooth discovery/connection on Android, the app requests runtime permission.
 
-## Arquivos principais
+## Main files
 
-- `lib/src/demo_page.dart`: UI vertical completa
-- `lib/src/demo_controller.dart`: estado e acoes assicronas
-- `lib/src/ticket_samples.dart`: templates de ticket
-- `lib/src/sample_image.dart`: geracao de raster para comando de imagem
+- `lib/src/demo_page.dart`: complete vertical UI
+- `lib/src/demo_controller.dart`: state and async actions
+- `lib/src/ticket_samples.dart`: ticket templates
+- `lib/src/sample_image.dart`: raster generation for image command

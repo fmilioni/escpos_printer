@@ -8,6 +8,19 @@ enum TextAlign { left, center, right }
 
 enum DrawerPin { pin2, pin5 }
 
+/// ESC/POS tables that keep compatibility with Latin-1 bytes.
+///
+/// The text encoder currently uses Latin-1 to generate bytes.
+/// For PT-BR accented output, [wcp1252] is the recommended default.
+enum EscPosCodeTable {
+  /// Windows-1252 on most Epson-compatible ESC/POS printers.
+  wcp1252(16);
+
+  const EscPosCodeTable(this.value);
+
+  final int value;
+}
+
 @immutable
 final class ReconnectPolicy {
   const ReconnectPolicy({
@@ -47,9 +60,17 @@ final class TemplateRenderOptions {
 
 @immutable
 final class PrintOptions {
-  const PrintOptions({this.paperWidthChars = 48, this.initializePrinter = true})
-    : assert(paperWidthChars > 0);
+  const PrintOptions({
+    this.paperWidthChars = 48,
+    this.initializePrinter = true,
+    this.codeTable = EscPosCodeTable.wcp1252,
+  }) : assert(paperWidthChars > 0);
 
   final int paperWidthChars;
   final bool initializePrinter;
+
+  /// Code table sent with `ESC t n` when [initializePrinter] is `true`.
+  ///
+  /// Use `null` to skip code table command emission.
+  final EscPosCodeTable? codeTable;
 }

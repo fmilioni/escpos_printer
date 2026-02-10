@@ -31,7 +31,7 @@ final class WifiSocketTransport implements PrinterTransport {
       );
     } catch (error) {
       throw ConnectionException(
-        'Falha ao conectar no endpoint Wi-Fi ${endpoint.host}:${endpoint.port}.',
+        'Failed to connect to Wi-Fi endpoint ${endpoint.host}:${endpoint.port}.',
         error,
       );
     }
@@ -51,7 +51,7 @@ final class WifiSocketTransport implements PrinterTransport {
 
   @override
   Future<PrinterStatus> getStatus() async {
-    // Em RAW TCP 9100, status em tempo real depende de hardware/protocolo extra.
+    // In raw TCP 9100 mode, realtime status depends on extra hardware/protocol support.
     return const PrinterStatus.unknown();
   }
 
@@ -59,7 +59,7 @@ final class WifiSocketTransport implements PrinterTransport {
   Future<void> write(List<int> data) async {
     final socket = _socket;
     if (socket == null) {
-      throw ConnectionException('Transporte Wi-Fi nao conectado.');
+      throw ConnectionException('Wi-Fi transport is not connected.');
     }
 
     try {
@@ -67,10 +67,7 @@ final class WifiSocketTransport implements PrinterTransport {
       await socket.flush();
     } catch (error) {
       _socket = null;
-      throw TransportException(
-        'Falha ao enviar bytes para impressora Wi-Fi.',
-        error,
-      );
+      throw TransportException('Failed to send bytes to Wi-Fi printer.', error);
     }
   }
 }

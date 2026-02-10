@@ -19,9 +19,9 @@ extension _PaperWidthPresetX on _PaperWidthPreset {
   String get label {
     switch (this) {
       case _PaperWidthPreset.mm58:
-        return '58mm (32 colunas)';
+        return '58mm (32 columns)';
       case _PaperWidthPreset.mm80:
-        return '80mm (48 colunas)';
+        return '80mm (48 columns)';
     }
   }
 }
@@ -178,11 +178,11 @@ class _DemoPageState extends State<DemoPage> {
   Widget _buildSessionSection(BuildContext context) {
     final caps = _controller.capabilities;
     return _sectionCard(
-      title: '1) Sessao atual',
+      title: '1) Current session',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(_controller.isConnected ? 'Conectado' : 'Desconectado'),
+          Text(_controller.isConnected ? 'Connected' : 'Disconnected'),
           const SizedBox(height: 6),
           Text(
             'Endpoint: ${_controller.connectedEndpoint != null ? DemoController.describeEndpoint(_controller.connectedEndpoint!) : '-'}',
@@ -194,19 +194,19 @@ class _DemoPageState extends State<DemoPage> {
               spacing: 6,
               runSpacing: 6,
               children: <Widget>[
-                _capabilityChip('Cut parcial', caps.supportsPartialCut),
-                _capabilityChip('Cut total', caps.supportsFullCut),
-                _capabilityChip('Gaveta', caps.supportsDrawerKick),
-                _capabilityChip('Status realtime', caps.supportsRealtimeStatus),
+                _capabilityChip('Partial cut', caps.supportsPartialCut),
+                _capabilityChip('Full cut', caps.supportsFullCut),
+                _capabilityChip('Drawer', caps.supportsDrawerKick),
+                _capabilityChip('Realtime status', caps.supportsRealtimeStatus),
                 _capabilityChip('QR', caps.supportsQrCode),
                 _capabilityChip('Barcode', caps.supportsBarcode),
-                _capabilityChip('Imagem', caps.supportsImage),
+                _capabilityChip('Image', caps.supportsImage),
               ],
             ),
           if (_controller.lastError != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(
-              'Ultimo erro: ${_controller.lastError}',
+              'Last error: ${_controller.lastError}',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
@@ -214,7 +214,7 @@ class _DemoPageState extends State<DemoPage> {
           FilledButton.tonalIcon(
             onPressed: _controller.connecting ? null : _controller.disconnect,
             icon: const Icon(Icons.link_off),
-            label: const Text('Desconectar'),
+            label: const Text('Disconnect'),
           ),
         ],
       ),
@@ -223,7 +223,7 @@ class _DemoPageState extends State<DemoPage> {
 
   Widget _buildSearchSection(BuildContext context) {
     return _sectionCard(
-      title: '2) Busca de impressoras',
+      title: '2) Printer search',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -259,7 +259,7 @@ class _DemoPageState extends State<DemoPage> {
               Expanded(
                 child: _field(
                   _searchTimeoutCtrl,
-                  label: 'Timeout (segundos)',
+                  label: 'Timeout (seconds)',
                   keyboardType: TextInputType.number,
                 ),
               ),
@@ -267,7 +267,7 @@ class _DemoPageState extends State<DemoPage> {
               Expanded(
                 child: _field(
                   _searchWifiPortCtrl,
-                  label: 'Porta Wi-Fi',
+                  label: 'Wi-Fi port',
                   keyboardType: TextInputType.number,
                 ),
               ),
@@ -276,7 +276,7 @@ class _DemoPageState extends State<DemoPage> {
           const SizedBox(height: 8),
           _field(
             _searchCidrsCtrl,
-            label: 'CIDRs Wi-Fi (opcional, separados por virgula/linha)',
+            label: 'Wi-Fi CIDRs (optional, comma/newline-separated)',
             maxLines: 2,
           ),
           const SizedBox(height: 10),
@@ -284,12 +284,12 @@ class _DemoPageState extends State<DemoPage> {
             onPressed: _controller.searching ? null : _onSearchPressed,
             icon: const Icon(Icons.search),
             label: Text(
-              _controller.searching ? 'Buscando...' : 'Buscar impressoras',
+              _controller.searching ? 'Searching...' : 'Search printers',
             ),
           ),
           const SizedBox(height: 10),
           if (_controller.printers.isEmpty)
-            const Text('Nenhuma impressora listada.')
+            const Text('No printers listed.')
           else
             ListView.separated(
               shrinkWrap: true,
@@ -304,7 +304,7 @@ class _DemoPageState extends State<DemoPage> {
                     onPressed: _controller.connecting
                         ? null
                         : () => _controller.connectDiscovered(printer),
-                    child: const Text('Conectar'),
+                    child: const Text('Connect'),
                   ),
                 );
               },
@@ -318,14 +318,14 @@ class _DemoPageState extends State<DemoPage> {
 
   Widget _buildManualConnectionSection(BuildContext context) {
     return _sectionCard(
-      title: '3) Conexao manual',
+      title: '3) Manual connection',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           DropdownButtonFormField<ManualConnectionMode>(
             initialValue: _manualMode,
             decoration: const InputDecoration(
-              labelText: 'Modo de conexao',
+              labelText: 'Connection mode',
               border: OutlineInputBorder(),
             ),
             items: ManualConnectionMode.values
@@ -351,7 +351,7 @@ class _DemoPageState extends State<DemoPage> {
           FilledButton.icon(
             onPressed: _controller.connecting ? null : _onManualConnectPressed,
             icon: const Icon(Icons.link),
-            label: const Text('Conectar manual'),
+            label: const Text('Connect manually'),
           ),
         ],
       ),
@@ -366,7 +366,7 @@ class _DemoPageState extends State<DemoPage> {
           const SizedBox(height: 8),
           _field(
             _wifiPortCtrl,
-            label: 'Porta',
+            label: 'Port',
             keyboardType: TextInputType.number,
           ),
         ];
@@ -378,14 +378,14 @@ class _DemoPageState extends State<DemoPage> {
               Expanded(
                 child: _field(
                   _usbVendorCtrl,
-                  label: 'VendorId (decimal ou 0xHEX)',
+                  label: 'VendorId (decimal or 0xHEX)',
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _field(
                   _usbProductCtrl,
-                  label: 'ProductId (decimal ou 0xHEX)',
+                  label: 'ProductId (decimal or 0xHEX)',
                 ),
               ),
             ],
@@ -393,7 +393,7 @@ class _DemoPageState extends State<DemoPage> {
           const SizedBox(height: 8),
           _field(
             _usbInterfaceCtrl,
-            label: 'InterfaceNumber (opcional)',
+            label: 'InterfaceNumber (optional)',
             keyboardType: TextInputType.number,
           ),
         ];
@@ -410,14 +410,14 @@ class _DemoPageState extends State<DemoPage> {
               Expanded(
                 child: _field(
                   _usbSerialVendorCtrl,
-                  label: 'VendorId (opcional)',
+                  label: 'VendorId (optional)',
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _field(
                   _usbSerialProductCtrl,
-                  label: 'ProductId (opcional)',
+                  label: 'ProductId (optional)',
                 ),
               ),
             ],
@@ -425,19 +425,19 @@ class _DemoPageState extends State<DemoPage> {
           const SizedBox(height: 8),
           _field(
             _usbSerialInterfaceCtrl,
-            label: 'InterfaceNumber (opcional)',
+            label: 'InterfaceNumber (optional)',
             keyboardType: TextInputType.number,
           ),
         ];
 
       case ManualConnectionMode.bluetooth:
         return <Widget>[
-          _field(_bluetoothAddressCtrl, label: 'Endereco Bluetooth (MAC)'),
+          _field(_bluetoothAddressCtrl, label: 'Bluetooth address (MAC)'),
           const SizedBox(height: 8),
           DropdownButtonFormField<BluetoothMode>(
             initialValue: _manualBluetoothMode,
             decoration: const InputDecoration(
-              labelText: 'Modo Bluetooth',
+              labelText: 'Bluetooth mode',
               border: OutlineInputBorder(),
             ),
             items: BluetoothMode.values
@@ -458,7 +458,7 @@ class _DemoPageState extends State<DemoPage> {
             },
           ),
           const SizedBox(height: 8),
-          _field(_bluetoothUuidCtrl, label: 'Service UUID (opcional)'),
+          _field(_bluetoothUuidCtrl, label: 'Service UUID (optional)'),
         ];
     }
   }
@@ -466,7 +466,7 @@ class _DemoPageState extends State<DemoPage> {
   Widget _buildStatusSection(BuildContext context) {
     final status = _controller.lastStatus;
     return _sectionCard(
-      title: '4) Status e comandos diretos',
+      title: '4) Status and quick commands',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -478,7 +478,7 @@ class _DemoPageState extends State<DemoPage> {
                 onPressed: _controller.readingStatus
                     ? null
                     : _controller.readStatus,
-                child: const Text('Ler status'),
+                child: const Text('Read status'),
               ),
               FilledButton.tonal(
                 onPressed: _controller.sendingCommand ? null : _controller.feed,
@@ -488,19 +488,19 @@ class _DemoPageState extends State<DemoPage> {
                 onPressed: _controller.sendingCommand
                     ? null
                     : _controller.cutPartial,
-                child: const Text('Cut parcial'),
+                child: const Text('Partial cut'),
               ),
               FilledButton.tonal(
                 onPressed: _controller.sendingCommand
                     ? null
                     : _controller.cutFull,
-                child: const Text('Cut total'),
+                child: const Text('Full cut'),
               ),
               FilledButton.tonal(
                 onPressed: _controller.sendingCommand
                     ? null
                     : _controller.openDrawer,
-                child: const Text('Abrir gaveta'),
+                child: const Text('Open drawer'),
               ),
             ],
           ),
@@ -525,30 +525,30 @@ class _DemoPageState extends State<DemoPage> {
   Widget _buildPrintSection(BuildContext context) {
     final result = _controller.lastPrintResult;
     return _sectionCard(
-      title: '5) Imprimir ticket de exemplo',
+      title: '5) Print sample ticket',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _field(_storeCtrl, label: 'Loja'),
+          _field(_storeCtrl, label: 'Store'),
           const SizedBox(height: 8),
-          _field(_customerCtrl, label: 'Cliente'),
+          _field(_customerCtrl, label: 'Customer'),
           const SizedBox(height: 8),
           _field(
             _itemsCtrl,
-            label: 'Itens (um por linha, formato nome=preco)',
+            label: 'Items (one per line, format name=price)',
             maxLines: 4,
           ),
           const SizedBox(height: 8),
           _field(_totalCtrl, label: 'Total'),
           const SizedBox(height: 8),
-          _field(_pixCtrl, label: 'Payload PIX', maxLines: 3),
+          _field(_pixCtrl, label: 'PIX payload', maxLines: 3),
           const SizedBox(height: 8),
-          _field(_barcodeCtrl, label: 'Codigo de barras'),
+          _field(_barcodeCtrl, label: 'Barcode value'),
           const SizedBox(height: 8),
           DropdownButtonFormField<_PaperWidthPreset>(
             initialValue: _paperWidthPreset,
             decoration: const InputDecoration(
-              labelText: 'Largura do papel',
+              labelText: 'Paper width',
               border: OutlineInputBorder(),
             ),
             items: _PaperWidthPreset.values
@@ -571,7 +571,7 @@ class _DemoPageState extends State<DemoPage> {
           const SizedBox(height: 8),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Aplicar comando de corte no template string'),
+            title: const Text('Apply cut command in string template'),
             value: _shouldCut,
             onChanged: (value) {
               setState(() {
@@ -585,25 +585,23 @@ class _DemoPageState extends State<DemoPage> {
             children: <Widget>[
               FilledButton(
                 onPressed: _controller.printing ? null : _onPrintDslPressed,
-                child: const Text('Imprimir ticket (DSL completo)'),
+                child: const Text('Print ticket (full DSL)'),
               ),
               FilledButton(
                 onPressed: _controller.printing ? null : _onPrintEscTplPressed,
-                child: const Text('Imprimir ticket (EscTpl string completo)'),
+                child: const Text('Print ticket (full EscTpl string)'),
               ),
               FilledButton(
                 onPressed: _controller.printing ? null : _onPrintHybridPressed,
-                child: const Text(
-                  'Imprimir ticket (Hibrido DSL+templateBlock)',
-                ),
+                child: const Text('Print ticket (Hybrid DSL+templateBlock)'),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Text(
             result == null
-                ? 'Sem resultado de impressao ainda.'
-                : 'Ultimo print: ${result.bytesSent} bytes | '
+                ? 'No print result yet.'
+                : 'Last print: ${result.bytesSent} bytes | '
                       '${result.duration.inMilliseconds} ms | '
                       'paperOut=${DemoController.formatTriState(result.status.paperOut)}',
           ),
@@ -614,7 +612,7 @@ class _DemoPageState extends State<DemoPage> {
 
   Widget _buildLogSection(BuildContext context) {
     return _sectionCard(
-      title: '6) Log de execucao',
+      title: '6) Execution log',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -622,10 +620,10 @@ class _DemoPageState extends State<DemoPage> {
             children: <Widget>[
               FilledButton.tonal(
                 onPressed: _controller.clearLogs,
-                child: const Text('Limpar log'),
+                child: const Text('Clear log'),
               ),
               const SizedBox(width: 8),
-              Text('Entradas: ${_controller.logs.length}'),
+              Text('Entries: ${_controller.logs.length}'),
             ],
           ),
           const SizedBox(height: 8),
@@ -638,7 +636,7 @@ class _DemoPageState extends State<DemoPage> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: _controller.logs.isEmpty
-                ? const Text('Sem logs no momento.')
+                ? const Text('No logs yet.')
                 : ListView.builder(
                     itemCount: _controller.logs.length,
                     itemBuilder: (context, index) {
@@ -658,7 +656,7 @@ class _DemoPageState extends State<DemoPage> {
       );
       final wifiPort = ManualConnectionDraft.parsePort(
         _searchWifiPortCtrl.text,
-        fieldName: 'Porta Wi-Fi',
+        fieldName: 'Wi-Fi port',
       );
       final cidrs = ManualConnectionDraft.parseCidrsInput(
         _searchCidrsCtrl.text,
@@ -671,7 +669,7 @@ class _DemoPageState extends State<DemoPage> {
         wifiCidrs: cidrs,
       );
     } catch (error) {
-      _showSnack('Falha ao iniciar busca: $error');
+      _showSnack('Failed to start search: $error');
     }
   }
 
@@ -695,7 +693,7 @@ class _DemoPageState extends State<DemoPage> {
     try {
       await _controller.connectManual(draft);
     } catch (error) {
-      _showSnack('Falha na conexao manual: $error');
+      _showSnack('Manual connection failed: $error');
     }
   }
 

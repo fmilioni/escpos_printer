@@ -46,7 +46,7 @@ abstract class PlatformChannelTransport implements PrinterTransport {
   Future<void> write(List<int> data) async {
     final current = _sessionId;
     if (current == null) {
-      throw ConnectionException('Transporte nativo nao conectado.');
+      throw ConnectionException('Native transport is not connected.');
     }
 
     try {
@@ -61,7 +61,7 @@ abstract class PlatformChannelTransport implements PrinterTransport {
   Future<PrinterStatus> getStatus() async {
     final current = _sessionId;
     if (current == null) {
-      throw ConnectionException('Transporte nativo nao conectado.');
+      throw ConnectionException('Native transport is not connected.');
     }
 
     try {

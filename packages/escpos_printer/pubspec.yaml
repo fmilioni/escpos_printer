@@ -1,6 +1,6 @@
 name: escpos_printer
 description: Flutter library/plugin for ESC/POS thermal printing with Wi-Fi, USB and Bluetooth transports.
-version: 0.0.1
+version: 0.0.2
 publish_to: none
 homepage:
 

@@ -42,7 +42,7 @@ final class UsbEndpoint extends PrinterEndpoint {
     this.interfaceNumber,
   }) : assert(
          serialNumber != null && serialNumber != '',
-         'serialNumber/path nao pode ser vazio.',
+         'serialNumber/path cannot be empty.',
        );
 
   final int? vendorId;

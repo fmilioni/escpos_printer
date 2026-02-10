@@ -106,14 +106,14 @@ bool ReadRequiredString(FlValue *map, const char *key, std::string *out, std::st
     FlValue *value = fl_value_lookup_string(map, key);
     if (IsNullValue(value) || fl_value_get_type(value) != FL_VALUE_TYPE_STRING)
     {
-        *error = std::string("Campo obrigatorio ausente ou invalido: ") + key;
+        *error = std::string("Missing or invalid required field: ") + key;
         return false;
     }
 
     const gchar *raw = fl_value_get_string(value);
     if (raw == nullptr || std::strlen(raw) == 0)
     {
-        *error = std::string("Campo obrigatorio vazio: ") + key;
+        *error = std::string("Required field is empty: ") + key;
         return false;
     }
 
@@ -425,7 +425,7 @@ int OpenTcpSocket(const std::string &host, int port, std::string *error)
     int rc = getaddrinfo(host.c_str(), port_buffer, &hints, &result);
     if (rc != 0)
     {
-        *error = std::string("Falha ao resolver host: ") + gai_strerror(rc);
+        *error = std::string("Failed to resolve host: ") + gai_strerror(rc);
         return -1;
     }
 
@@ -451,7 +451,7 @@ int OpenTcpSocket(const std::string &host, int port, std::string *error)
 
     if (socket_fd < 0)
     {
-        *error = LastErrnoText("Falha ao conectar socket TCP");
+        *error = LastErrnoText("Failed to connect TCP socket");
     }
 
     return socket_fd;
@@ -491,7 +491,7 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
 {
     if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP)
     {
-        return MakeErrorResponse("invalid_args", "openConnection requer payload map.");
+        return MakeErrorResponse("invalid_args", "openConnection requires a map payload.");
     }
 
     std::string transport;
@@ -536,7 +536,7 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
         int socket_fd = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
         if (socket_fd < 0)
         {
-            return MakeErrorResponse("connect_failed", LastErrnoText("Falha ao criar socket Bluetooth"));
+            return MakeErrorResponse("connect_failed", LastErrnoText("Failed to create Bluetooth socket"));
         }
 
         sockaddr_rc addr = {};
@@ -545,12 +545,12 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
         if (str2ba(address.c_str(), &addr.rc_bdaddr) != 0)
         {
             close(socket_fd);
-            return MakeErrorResponse("invalid_args", "Endereco Bluetooth invalido.");
+            return MakeErrorResponse("invalid_args", "Invalid Bluetooth address.");
         }
 
         if (connect(socket_fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) != 0)
         {
-            std::string err = LastErrnoText("Falha ao conectar Bluetooth RFCOMM");
+            std::string err = LastErrnoText("Failed to connect Bluetooth RFCOMM");
             close(socket_fd);
             return MakeErrorResponse("connect_failed", err);
         }
@@ -564,7 +564,7 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
         int product_id = 0;
         if (!ReadOptionalInt(args, "vendorId", &vendor_id) || !ReadOptionalInt(args, "productId", &product_id))
         {
-            return MakeErrorResponse("invalid_args", "vendorId e productId sao obrigatorios para USB.");
+            return MakeErrorResponse("invalid_args", "vendorId and productId are required for USB.");
         }
 
         int preferred_interface = -1;
@@ -574,14 +574,14 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
         int rc = libusb_init(&usb_context);
         if (rc != 0 || usb_context == nullptr)
         {
-            return MakeErrorResponse("connect_failed", "Falha ao inicializar libusb.");
+            return MakeErrorResponse("connect_failed", "Failed to initialize libusb.");
         }
 
         libusb_device_handle *usb_handle = libusb_open_device_with_vid_pid(usb_context, vendor_id, product_id);
         if (usb_handle == nullptr)
         {
             libusb_exit(usb_context);
-            return MakeErrorResponse("connect_failed", "Dispositivo USB nao encontrado (vendorId/productId).");
+            return MakeErrorResponse("connect_failed", "USB device not found (vendorId/productId).");
         }
 
         int interface_number = -1;
@@ -590,7 +590,7 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
         {
             libusb_close(usb_handle);
             libusb_exit(usb_context);
-            return MakeErrorResponse("connect_failed", "Endpoint BULK OUT nao encontrado para USB.");
+            return MakeErrorResponse("connect_failed", "BULK OUT endpoint not found for USB.");
         }
 
         if (libusb_kernel_driver_active(usb_handle, interface_number) == 1)
@@ -603,7 +603,7 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
         {
             libusb_close(usb_handle);
             libusb_exit(usb_context);
-            return MakeErrorResponse("connect_failed", "Falha ao claim da interface USB.");
+            return MakeErrorResponse("connect_failed", "Failed to claim USB interface.");
         }
 
         connection->kind = SessionKind::kUsb;
@@ -614,7 +614,7 @@ FlMethodResponse *HandleOpenConnection(FlValue *args)
     }
     else
     {
-        return MakeErrorResponse("invalid_args", "Transporte invalido. Use wifi, usb ou bluetooth.");
+        return MakeErrorResponse("invalid_args", "Invalid transport. Use wifi, usb, or bluetooth.");
     }
 
     std::string session_id = BuildSessionId();
@@ -633,7 +633,7 @@ FlMethodResponse *HandleWrite(FlValue *args)
 {
     if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP)
     {
-        return MakeErrorResponse("invalid_args", "write requer payload map.");
+        return MakeErrorResponse("invalid_args", "write requires a map payload.");
     }
 
     std::string session_id;
@@ -646,7 +646,7 @@ FlMethodResponse *HandleWrite(FlValue *args)
     FlValue *bytes_value = fl_value_lookup_string(args, "bytes");
     if (IsNullValue(bytes_value) || fl_value_get_type(bytes_value) != FL_VALUE_TYPE_UINT8_LIST)
     {
-        return MakeErrorResponse("invalid_args", "Campo bytes deve ser Uint8List.");
+        return MakeErrorResponse("invalid_args", "bytes field must be Uint8List.");
     }
 
     const uint8_t *bytes = fl_value_get_uint8_list(bytes_value);
@@ -656,7 +656,7 @@ FlMethodResponse *HandleWrite(FlValue *args)
     auto iterator = g_sessions.find(session_id);
     if (iterator == g_sessions.end())
     {
-        return MakeErrorResponse("invalid_session", "Sessao nao encontrada.");
+        return MakeErrorResponse("invalid_session", "Session not found.");
     }
 
     NativeConnection *connection = iterator->second.get();
@@ -667,7 +667,7 @@ FlMethodResponse *HandleWrite(FlValue *args)
                                       &transferred, 4000);
         if (rc != 0 || transferred != static_cast<int>(length))
         {
-            return MakeErrorResponse("write_failed", "Falha ao enviar bytes via USB.");
+            return MakeErrorResponse("write_failed", "Failed to send bytes over USB.");
         }
     }
     else
@@ -675,7 +675,7 @@ FlMethodResponse *HandleWrite(FlValue *args)
         ssize_t written = send(connection->fd, bytes, length, 0);
         if (written < 0 || static_cast<size_t>(written) != length)
         {
-            return MakeErrorResponse("write_failed", LastErrnoText("Falha ao enviar bytes"));
+            return MakeErrorResponse("write_failed", LastErrnoText("Failed to send bytes"));
         }
     }
 
@@ -686,7 +686,7 @@ FlMethodResponse *HandleReadStatus(FlValue *args)
 {
     if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP)
     {
-        return MakeErrorResponse("invalid_args", "readStatus requer payload map.");
+        return MakeErrorResponse("invalid_args", "readStatus requires a map payload.");
     }
 
     std::string session_id;
@@ -700,7 +700,7 @@ FlMethodResponse *HandleReadStatus(FlValue *args)
     auto iterator = g_sessions.find(session_id);
     if (iterator == g_sessions.end())
     {
-        return MakeErrorResponse("invalid_session", "Sessao nao encontrada.");
+        return MakeErrorResponse("invalid_session", "Session not found.");
     }
 
     return FL_METHOD_RESPONSE(fl_method_success_response_new(MakeUnknownStatusValue()));
@@ -710,7 +710,7 @@ FlMethodResponse *HandleCloseConnection(FlValue *args)
 {
     if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP)
     {
-        return MakeErrorResponse("invalid_args", "closeConnection requer payload map.");
+        return MakeErrorResponse("invalid_args", "closeConnection requires a map payload.");
     }
 
     std::string session_id;
@@ -741,7 +741,7 @@ FlMethodResponse *HandleGetCapabilities(FlValue *args)
 {
     if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP)
     {
-        return MakeErrorResponse("invalid_args", "getCapabilities requer payload map.");
+        return MakeErrorResponse("invalid_args", "getCapabilities requires a map payload.");
     }
 
     std::string session_id;
@@ -755,7 +755,7 @@ FlMethodResponse *HandleGetCapabilities(FlValue *args)
     auto iterator = g_sessions.find(session_id);
     if (iterator == g_sessions.end())
     {
-        return MakeErrorResponse("invalid_session", "Sessao nao encontrada.");
+        return MakeErrorResponse("invalid_session", "Session not found.");
     }
 
     g_autoptr(FlValue) result_map = fl_value_new_map();

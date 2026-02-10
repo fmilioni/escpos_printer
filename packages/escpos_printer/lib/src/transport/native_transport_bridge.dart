@@ -17,7 +17,7 @@ final class NativeConnectionSession {
   final PrinterCapabilities capabilities;
 }
 
-/// Bridge para operações de transporte nativo (USB/Bluetooth) usando contrato tipado.
+/// Bridge for native transport operations (USB/Bluetooth) using a typed contract.
 class NativeTransportBridge {
   NativeTransportBridge({NativeTransportApi? api})
     : _api = api ?? NativeTransportApi();
@@ -34,7 +34,7 @@ class NativeTransportBridge {
         capabilities: _mapCapabilities(response.capabilities),
       );
     } catch (error) {
-      throw TransportException('Falha ao abrir conexao nativa.', error);
+      throw TransportException('Failed to open native connection.', error);
     }
   }
 
@@ -44,10 +44,7 @@ class NativeTransportBridge {
         WritePayload(sessionId: sessionId, bytes: Uint8List.fromList(bytes)),
       );
     } catch (error) {
-      throw TransportException(
-        'Falha ao escrever no transporte nativo.',
-        error,
-      );
+      throw TransportException('Failed to write to native transport.', error);
     }
   }
 
@@ -73,7 +70,7 @@ class NativeTransportBridge {
     try {
       await _api.closeConnection(SessionPayload(sessionId));
     } catch (error) {
-      throw TransportException('Falha ao fechar conexao nativa.', error);
+      throw TransportException('Failed to close native connection.', error);
     }
   }
 
@@ -105,7 +102,7 @@ class NativeTransportBridge {
       }
       return List<DiscoveredPrinter>.unmodifiable(discovered);
     } catch (error) {
-      throw TransportException('Falha ao buscar impressoras nativas.', error);
+      throw TransportException('Failed to search native printers.', error);
     }
   }
 

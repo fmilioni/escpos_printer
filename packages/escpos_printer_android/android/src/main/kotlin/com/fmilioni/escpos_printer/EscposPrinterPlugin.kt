@@ -52,14 +52,14 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun handleOpenConnection(call: MethodCall, result: Result) {
-        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("openConnection requer payload")
-        val transport = args["transport"] as? String ?: throw IllegalArgumentException("transport ausente")
+        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("openConnection requires payload")
+        val transport = args["transport"] as? String ?: throw IllegalArgumentException("missing transport")
 
         val connection = when (transport.lowercase()) {
             "usb" -> openUsbConnection(args)
             "bluetooth" -> openBluetoothConnection(args)
             "wifi" -> openWifiConnection(args)
-            else -> throw IllegalArgumentException("Transporte nao suportado: $transport")
+            else -> throw IllegalArgumentException("Unsupported transport: $transport")
         }
 
         val sessionId = UUID.randomUUID().toString()
@@ -73,26 +73,26 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun handleWrite(call: MethodCall, result: Result) {
-        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("write requer payload")
-        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("sessionId ausente")
-        val payload = args["bytes"] as? ByteArray ?: throw IllegalArgumentException("bytes ausente")
+        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("write requires payload")
+        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("missing sessionId")
+        val payload = args["bytes"] as? ByteArray ?: throw IllegalArgumentException("missing bytes")
 
-        val connection = sessions[sessionId] ?: throw IllegalStateException("Sessao nao encontrada: $sessionId")
+        val connection = sessions[sessionId] ?: throw IllegalStateException("Session not found: $sessionId")
         connection.write(payload)
         result.success(null)
     }
 
     private fun handleReadStatus(call: MethodCall, result: Result) {
-        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("readStatus requer payload")
-        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("sessionId ausente")
+        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("readStatus requires payload")
+        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("missing sessionId")
 
-        val connection = sessions[sessionId] ?: throw IllegalStateException("Sessao nao encontrada: $sessionId")
+        val connection = sessions[sessionId] ?: throw IllegalStateException("Session not found: $sessionId")
         result.success(connection.readStatus())
     }
 
     private fun handleCloseConnection(call: MethodCall, result: Result) {
-        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("closeConnection requer payload")
-        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("sessionId ausente")
+        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("closeConnection requires payload")
+        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("missing sessionId")
 
         val connection = sessions.remove(sessionId)
         connection?.close()
@@ -100,10 +100,10 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun handleGetCapabilities(call: MethodCall, result: Result) {
-        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("getCapabilities requer payload")
-        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("sessionId ausente")
+        val args = call.arguments as? Map<*, *> ?: throw IllegalArgumentException("getCapabilities requires payload")
+        val sessionId = args["sessionId"] as? String ?: throw IllegalArgumentException("missing sessionId")
 
-        val connection = sessions[sessionId] ?: throw IllegalStateException("Sessao nao encontrada: $sessionId")
+        val connection = sessions[sessionId] ?: throw IllegalStateException("Session not found: $sessionId")
         result.success(mapOf("capabilities" to connection.capabilities()))
     }
 
@@ -126,45 +126,45 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun openUsbConnection(args: Map<*, *>): NativeConnection {
-        val vendorId = (args["vendorId"] as? Number)?.toInt() ?: throw IllegalArgumentException("vendorId ausente")
-        val productId = (args["productId"] as? Number)?.toInt() ?: throw IllegalArgumentException("productId ausente")
+        val vendorId = (args["vendorId"] as? Number)?.toInt() ?: throw IllegalArgumentException("missing vendorId")
+        val productId = (args["productId"] as? Number)?.toInt() ?: throw IllegalArgumentException("missing productId")
         val interfaceNumber = (args["interfaceNumber"] as? Number)?.toInt()
 
         val manager = context.getSystemService(Context.USB_SERVICE) as UsbManager
         val device = findUsbDevice(manager, vendorId, productId)
-            ?: throw IllegalStateException("Dispositivo USB nao encontrado ($vendorId:$productId)")
+            ?: throw IllegalStateException("USB device not found ($vendorId:$productId)")
 
         if (!manager.hasPermission(device)) {
-            throw SecurityException("Sem permissao USB para o dispositivo selecionado")
+            throw SecurityException("No USB permission for the selected device")
         }
 
         val connection = manager.openDevice(device)
-            ?: throw IllegalStateException("Falha ao abrir conexao USB")
+            ?: throw IllegalStateException("Failed to open USB connection")
 
         val usbInterface = pickInterface(device, interfaceNumber)
-            ?: throw IllegalStateException("Nao foi encontrada interface USB compativel")
+            ?: throw IllegalStateException("No compatible USB interface found")
 
         if (!connection.claimInterface(usbInterface, true)) {
             connection.close()
-            throw IllegalStateException("Falha ao claim da interface USB")
+            throw IllegalStateException("Failed to claim USB interface")
         }
 
         val endpoint = pickBulkOutEndpoint(usbInterface)
             ?: run {
                 connection.releaseInterface(usbInterface)
                 connection.close()
-                throw IllegalStateException("Nao foi encontrado endpoint BULK OUT")
+                throw IllegalStateException("BULK OUT endpoint not found")
             }
 
         return UsbNativeConnection(connection, usbInterface, endpoint)
     }
 
     private fun openBluetoothConnection(args: Map<*, *>): NativeConnection {
-        val address = args["address"] as? String ?: throw IllegalArgumentException("address ausente")
+        val address = args["address"] as? String ?: throw IllegalArgumentException("missing address")
         val serviceUuidRaw = args["serviceUuid"] as? String
 
         val adapter = BluetoothAdapter.getDefaultAdapter()
-            ?: throw IllegalStateException("Bluetooth nao disponivel")
+            ?: throw IllegalStateException("Bluetooth not available")
 
         val device = adapter.getRemoteDevice(address)
         val uuid = if (serviceUuidRaw.isNullOrBlank()) {
@@ -180,7 +180,7 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun openWifiConnection(args: Map<*, *>): NativeConnection {
-        val host = args["host"] as? String ?: throw IllegalArgumentException("host ausente")
+        val host = args["host"] as? String ?: throw IllegalArgumentException("missing host")
         val port = (args["port"] as? Number)?.toInt() ?: 9100
         val timeoutMs = (args["timeoutMs"] as? Number)?.toInt() ?: 5000
 
@@ -295,7 +295,7 @@ class EscposPrinterPlugin : FlutterPlugin, MethodCallHandler {
         override fun write(bytes: ByteArray) {
             val transferred = connection.bulkTransfer(endpoint, bytes, bytes.size, 4000)
             if (transferred < 0) {
-                throw IllegalStateException("Falha ao enviar dados via USB")
+                throw IllegalStateException("Failed to send data over USB")
             }
         }
 

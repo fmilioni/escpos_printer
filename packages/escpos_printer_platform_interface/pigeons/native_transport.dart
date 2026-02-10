@@ -1,6 +1,6 @@
-// Referência do contrato tipado (estilo Pigeon) para NativeTransport.
-// Esta versão fica no repositório como spec de contrato sem dependência externa,
-// para evitar acoplamento de build com geração automática neste momento.
+// Typed contract reference (Pigeon style) for NativeTransport.
+// This version stays in-repo as a contract spec without external dependency,
+// avoiding build coupling with code generation at this stage.
 
 class EndpointPayload {
   const EndpointPayload();

@@ -1,5 +1,5 @@
-#ifndef FLUTTER_PLUGIN_ESCPOS_PRINTER_PLUGIN_H_
-#define FLUTTER_PLUGIN_ESCPOS_PRINTER_PLUGIN_H_
+#ifndef FLUTTER_PLUGIN_ESCPOS_PRINTER_WINDOWS_PLUGIN_H_
+#define FLUTTER_PLUGIN_ESCPOS_PRINTER_WINDOWS_PLUGIN_H_
 
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
@@ -27,4 +27,4 @@ class EscposPrinterPlugin : public flutter::Plugin
 
 } // namespace escpos_printer
 
-#endif // FLUTTER_PLUGIN_ESCPOS_PRINTER_PLUGIN_H_
+#endif // FLUTTER_PLUGIN_ESCPOS_PRINTER_WINDOWS_PLUGIN_H_

@@ -1,15 +1,15 @@
-#include "include/escpos_printer/escpos_printer_plugin.h"
+#include "include/escpos_printer_windows/escpos_printer_plugin.h"
 
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
-#include <bluetoothapis.h>
-#include <setupapi.h>
-#include <windows.h>
 #include <winsock2.h>
 #include <ws2bth.h>
 #include <ws2tcpip.h>
+#include <windows.h>
+#include <bluetoothapis.h>
+#include <setupapi.h>
 
 #include <algorithm>
 #include <cctype>
@@ -71,7 +71,7 @@ void EnsureWinsock()
     int rc = WSAStartup(MAKEWORD(2, 2), &data);
     if (rc != 0)
     {
-        throw std::runtime_error("Falha ao inicializar Winsock.");
+        throw std::runtime_error("Failed to initialize Winsock.");
     }
 
     g_winsock_initialized = true;
@@ -127,7 +127,7 @@ std::string RequireString(const EncodableMap &args, const char *key)
     const EncodableValue *raw = FindArg(args, key);
     if (raw == nullptr)
     {
-        throw std::runtime_error(std::string("Campo obrigatorio ausente: ") + key);
+        throw std::runtime_error(std::string("Missing required field: ") + key);
     }
 
     if (const auto *value = std::get_if<std::string>(raw))
@@ -138,7 +138,7 @@ std::string RequireString(const EncodableMap &args, const char *key)
         }
     }
 
-    throw std::runtime_error(std::string("Campo string invalido: ") + key);
+    throw std::runtime_error(std::string("Invalid string field: ") + key);
 }
 
 int RequireInt(const EncodableMap &args, const char *key)
@@ -146,7 +146,7 @@ int RequireInt(const EncodableMap &args, const char *key)
     const EncodableValue *raw = FindArg(args, key);
     if (raw == nullptr)
     {
-        throw std::runtime_error(std::string("Campo inteiro obrigatorio ausente: ") + key);
+        throw std::runtime_error(std::string("Missing required integer field: ") + key);
     }
 
     if (const auto *value = std::get_if<int32_t>(raw))
@@ -158,7 +158,7 @@ int RequireInt(const EncodableMap &args, const char *key)
         return static_cast<int>(*value64);
     }
 
-    throw std::runtime_error(std::string("Campo inteiro invalido: ") + key);
+    throw std::runtime_error(std::string("Invalid integer field: ") + key);
 }
 
 std::optional<int> ReadOptionalInt(const EncodableMap &args, const char *key)
@@ -216,7 +216,7 @@ std::vector<uint8_t> RequireBytes(const EncodableMap &args, const char *key)
     const EncodableValue *raw = FindArg(args, key);
     if (raw == nullptr)
     {
-        throw std::runtime_error(std::string("Campo bytes obrigatorio ausente: ") + key);
+        throw std::runtime_error(std::string("Missing required bytes field: ") + key);
     }
 
     if (const auto *bytes = std::get_if<std::vector<uint8_t>>(raw))
@@ -224,7 +224,7 @@ std::vector<uint8_t> RequireBytes(const EncodableMap &args, const char *key)
         return *bytes;
     }
 
-    throw std::runtime_error(std::string("Campo bytes invalido: ") + key);
+    throw std::runtime_error(std::string("Invalid bytes field: ") + key);
 }
 
 EncodableMap BuildCapabilities(bool realtime_status = false)
@@ -282,7 +282,7 @@ SOCKET ConnectTcpSocket(const std::string &host, int port)
     int rc = getaddrinfo(host.c_str(), port_buffer, &hints, &results);
     if (rc != 0)
     {
-        throw std::runtime_error("Falha ao resolver host TCP.");
+        throw std::runtime_error("Failed to resolve TCP host.");
     }
 
     SOCKET socket_fd = INVALID_SOCKET;
@@ -307,7 +307,7 @@ SOCKET ConnectTcpSocket(const std::string &host, int port)
 
     if (socket_fd == INVALID_SOCKET)
     {
-        throw std::runtime_error(LastSocketErrorText("Falha ao conectar TCP"));
+        throw std::runtime_error(LastSocketErrorText("Failed to connect TCP"));
     }
 
     return socket_fd;
@@ -328,7 +328,7 @@ ULONGLONG ParseBluetoothAddress(const std::string &address)
 
     if (cleaned.size() != 12)
     {
-        throw std::runtime_error("Endereco Bluetooth invalido.");
+        throw std::runtime_error("Invalid Bluetooth address.");
     }
 
     ULONGLONG value = 0;
@@ -345,7 +345,7 @@ ULONGLONG ParseBluetoothAddress(const std::string &address)
         }
         else
         {
-            throw std::runtime_error("Endereco Bluetooth invalido.");
+            throw std::runtime_error("Invalid Bluetooth address.");
         }
     }
 
@@ -359,7 +359,7 @@ SOCKET ConnectBluetoothSocket(const std::string &address)
     SOCKET socket_fd = socket(AF_BTH, SOCK_STREAM, BTHPROTO_RFCOMM);
     if (socket_fd == INVALID_SOCKET)
     {
-        throw std::runtime_error(LastSocketErrorText("Falha ao criar socket Bluetooth"));
+        throw std::runtime_error(LastSocketErrorText("Failed to create Bluetooth socket"));
     }
 
     SOCKADDR_BTH remote = {};
@@ -369,7 +369,7 @@ SOCKET ConnectBluetoothSocket(const std::string &address)
 
     if (connect(socket_fd, reinterpret_cast<SOCKADDR *>(&remote), sizeof(remote)) != 0)
     {
-        std::string error = LastSocketErrorText("Falha ao conectar Bluetooth RFCOMM");
+        std::string error = LastSocketErrorText("Failed to connect Bluetooth RFCOMM");
         closesocket(socket_fd);
         throw std::runtime_error(error);
     }
@@ -678,7 +678,7 @@ HANDLE OpenUsbFileHandle(const std::string &serial_or_path)
     if (handle == INVALID_HANDLE_VALUE)
     {
         std::ostringstream out;
-        out << "Falha ao abrir dispositivo USB/serial em " << path;
+        out << "Failed to open USB/serial device at " << path;
         throw std::runtime_error(out.str());
     }
 
@@ -720,7 +720,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
         {
             if (args == nullptr)
             {
-                result->Error("invalid_args", "openConnection requer payload map.");
+                result->Error("invalid_args", "openConnection requires a map payload.");
                 return;
             }
 
@@ -764,7 +764,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
 
                 if (!serial_or_path.has_value())
                 {
-                    result->Error("invalid_args", "Para USB informe serialNumber/COM ou vendorId+productId com porta resolvivel.");
+                    result->Error("invalid_args", "For USB, provide serialNumber/COM or vendorId+productId with a resolvable port.");
                     return;
                 }
 
@@ -773,7 +773,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
             }
             else
             {
-                result->Error("invalid_args", "Transporte invalido. Use wifi, usb ou bluetooth.");
+                result->Error("invalid_args", "Invalid transport. Use wifi, usb, or bluetooth.");
                 return;
             }
 
@@ -796,7 +796,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
         {
             if (args == nullptr)
             {
-                result->Error("invalid_args", "write requer payload map.");
+                result->Error("invalid_args", "write requires a map payload.");
                 return;
             }
 
@@ -807,7 +807,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
             auto iterator = g_sessions.find(session_id);
             if (iterator == g_sessions.end())
             {
-                result->Error("invalid_session", "Sessao nao encontrada.");
+                result->Error("invalid_session", "Session not found.");
                 return;
             }
 
@@ -818,7 +818,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
                 BOOL ok = WriteFile(session->handle, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr);
                 if (!ok || written != bytes.size())
                 {
-                    result->Error("write_failed", "Falha ao enviar bytes no dispositivo USB.");
+                    result->Error("write_failed", "Failed to send bytes on USB device.");
                     return;
                 }
             }
@@ -827,7 +827,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
                 int sent = send(session->socket, reinterpret_cast<const char *>(bytes.data()), static_cast<int>(bytes.size()), 0);
                 if (sent <= 0 || sent != static_cast<int>(bytes.size()))
                 {
-                    result->Error("write_failed", LastSocketErrorText("Falha ao enviar bytes"));
+                    result->Error("write_failed", LastSocketErrorText("Failed to send bytes"));
                     return;
                 }
             }
@@ -840,7 +840,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
         {
             if (args == nullptr)
             {
-                result->Error("invalid_args", "readStatus requer payload map.");
+                result->Error("invalid_args", "readStatus requires a map payload.");
                 return;
             }
 
@@ -848,7 +848,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
             std::lock_guard<std::mutex> lock(g_mutex);
             if (g_sessions.find(session_id) == g_sessions.end())
             {
-                result->Error("invalid_session", "Sessao nao encontrada.");
+                result->Error("invalid_session", "Session not found.");
                 return;
             }
 
@@ -860,7 +860,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
         {
             if (args == nullptr)
             {
-                result->Error("invalid_args", "closeConnection requer payload map.");
+                result->Error("invalid_args", "closeConnection requires a map payload.");
                 return;
             }
 
@@ -885,7 +885,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
         {
             if (args == nullptr)
             {
-                result->Error("invalid_args", "getCapabilities requer payload map.");
+                result->Error("invalid_args", "getCapabilities requires a map payload.");
                 return;
             }
 
@@ -893,7 +893,7 @@ void EscposPrinterPlugin::HandleMethodCall(const flutter::MethodCall<flutter::En
             std::lock_guard<std::mutex> lock(g_mutex);
             if (g_sessions.find(session_id) == g_sessions.end())
             {
-                result->Error("invalid_session", "Sessao nao encontrada.");
+                result->Error("invalid_session", "Session not found.");
                 return;
             }
 

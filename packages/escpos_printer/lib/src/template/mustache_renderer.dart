@@ -25,9 +25,7 @@ final class MustacheRenderer {
           final resolved = context.resolve(path);
           if (!resolved.found) {
             if (context.strictMissingVariables) {
-              throw TemplateRenderException(
-                'Variavel obrigatoria ausente: $path',
-              );
+              throw TemplateRenderException('Missing required variable: $path');
             }
             continue;
           }
@@ -39,7 +37,7 @@ final class MustacheRenderer {
           if (!resolved.found) {
             if (context.strictMissingVariables) {
               throw TemplateRenderException(
-                'Colecao obrigatoria ausente em #each: $path',
+                'Missing required collection in #each: $path',
               );
             }
             continue;
@@ -48,7 +46,7 @@ final class MustacheRenderer {
           final iterable = resolved.value;
           if (iterable is! Iterable<Object?>) {
             throw TemplateValidationException(
-              'Bloco #each espera Iterable em "$path".',
+              '#each block expects Iterable at "$path".',
             );
           }
 
@@ -60,7 +58,7 @@ final class MustacheRenderer {
           if (!resolved.found) {
             if (context.strictMissingVariables) {
               throw TemplateRenderException(
-                'Variavel obrigatoria ausente em #if: $path',
+                'Missing required variable in #if: $path',
               );
             }
             continue;
@@ -85,7 +83,7 @@ final class MustacheRenderer {
       final open = source.indexOf('{{', cursor);
       if (open < 0) {
         if (closeTag != null) {
-          throw TemplateParseException('Bloco {{$closeTag}} nao foi fechado.');
+          throw TemplateParseException('Block {{$closeTag}} was not closed.');
         }
         if (cursor < source.length) {
           nodes.add(_TextNode(source.substring(cursor)));
@@ -100,20 +98,20 @@ final class MustacheRenderer {
       final close = source.indexOf('}}', open + 2);
       if (close < 0) {
         throw TemplateParseException(
-          'Tag Mustache sem fechamento em indice $open.',
+          'Mustache tag without closing braces at index $open.',
         );
       }
 
       final rawTag = source.substring(open + 2, close).trim();
       if (rawTag.isEmpty) {
-        throw TemplateParseException('Tag Mustache vazia em indice $open.');
+        throw TemplateParseException('Empty Mustache tag at index $open.');
       }
 
       if (rawTag.startsWith('#each ')) {
         final path = rawTag.substring(6).trim();
         if (path.isEmpty) {
           throw TemplateParseException(
-            'Bloco #each sem caminho em indice $open.',
+            '#each block missing path at index $open.',
           );
         }
         final nested = _parseSection(source, close + 2, 'each');
@@ -126,7 +124,7 @@ final class MustacheRenderer {
         final path = rawTag.substring(4).trim();
         if (path.isEmpty) {
           throw TemplateParseException(
-            'Bloco #if sem caminho em indice $open.',
+            '#if block missing path at index $open.',
           );
         }
         final nested = _parseSection(source, close + 2, 'if');
@@ -139,12 +137,12 @@ final class MustacheRenderer {
         final closingTag = rawTag.substring(1).trim();
         if (closeTag == null) {
           throw TemplateParseException(
-            'Fechamento {{$closingTag}} sem abertura correspondente.',
+            'Closing {{$closingTag}} without matching opening.',
           );
         }
         if (closingTag != closeTag) {
           throw TemplateParseException(
-            'Fechamento {{$closingTag}} inesperado. Esperado {{$closeTag}}.',
+            'Unexpected closing {{$closingTag}}. Expected {{$closeTag}}.',
           );
         }
         return _SectionParseResult(nodes, close + 2);
@@ -155,7 +153,7 @@ final class MustacheRenderer {
     }
 
     if (closeTag != null) {
-      throw TemplateParseException('Bloco {{$closeTag}} nao foi fechado.');
+      throw TemplateParseException('Block {{$closeTag}} was not closed.');
     }
 
     return _SectionParseResult(nodes, cursor);

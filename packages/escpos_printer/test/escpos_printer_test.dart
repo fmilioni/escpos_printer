@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:escpos_printer/escpos_printer.dart';
@@ -8,21 +9,21 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('MustacheRenderer', () {
-    test('renderiza variaveis, each e if', () {
+    test('renders variables, each, and if', () {
       const renderer = MustacheRenderer();
       final output = renderer.render(
-        'Loja: {{store}}\n{{#each items}}- {{this}}\n{{/each}}{{#if hasCoupon}}CUPOM{{/if}}',
+        'Store: {{store}}\n{{#each items}}- {{this}}\n{{/each}}{{#if hasCoupon}}COUPON{{/if}}',
         <String, Object?>{
-          'store': 'Mercadinho',
-          'items': <String>['Cafe', 'Pao'],
+          'store': 'Mini Market',
+          'items': <String>['Coffee', 'Bread'],
           'hasCoupon': true,
         },
       );
 
-      expect(output, 'Loja: Mercadinho\n- Cafe\n- Pao\nCUPOM');
+      expect(output, 'Store: Mini Market\n- Coffee\n- Bread\nCOUPON');
     });
 
-    test('lanca erro quando variavel obrigatoria nao existe', () {
+    test('throws when required variable is missing', () {
       const renderer = MustacheRenderer();
       expect(
         () => renderer.render('Total: {{price}}', <String, Object?>{}),
@@ -32,13 +33,13 @@ void main() {
   });
 
   group('EscTplParser', () {
-    test('parseia template com row e col', () {
+    test('parses template with row and col', () {
       const parser = EscTplParser();
       final ops = parser.parse('''
-@text align=center bold=true Loja XPTO
+@text align=center bold=true Store XPTO
 @row
-  @col flex=2 align=left Produto
-  @col flex=1 align=right 10,00
+  @col flex=2 align=left Product
+  @col flex=1 align=right 10.00
 @endrow
 @cut mode=partial
 ''');
@@ -54,7 +55,7 @@ void main() {
       expect(row.columns.last.align, TextAlign.right);
     });
 
-    test('lanca erro para bloco row sem fechamento', () {
+    test('throws for row block without closing', () {
       const parser = EscTplParser();
       expect(
         () => parser.parse('@row\n@col flex=1 A'),
@@ -64,7 +65,7 @@ void main() {
   });
 
   group('DefaultTransportFactory', () {
-    test('roteia USB e Bluetooth para transports nativos', () async {
+    test('routes USB and Bluetooth to native transports', () async {
       final bridge = FakeNativeTransportBridge();
       final factory = DefaultTransportFactory(nativeBridge: bridge);
 
@@ -88,7 +89,7 @@ void main() {
       expect(bridge.writes.length, 2);
     });
 
-    test('mantem Wi-Fi com transporte socket Dart', () async {
+    test('keeps Wi-Fi with Dart socket transport', () async {
       final factory = DefaultTransportFactory();
       final transport = await factory.create(const WifiEndpoint('127.0.0.1'));
       expect(transport, isA<WifiSocketTransport>());
@@ -96,7 +97,45 @@ void main() {
   });
 
   group('EscPosClient', () {
-    test('imprime template string com variaveis', () async {
+    test('sends WCP1252 code table by default for accented text', () async {
+      final factory = FakeTransportFactory();
+      final client = EscPosClient(transportFactory: factory);
+
+      await client.connect(const WifiEndpoint('127.0.0.1'));
+      await client.print(
+        template: ReceiptTemplate.dsl((builder) {
+          builder.text('FAÇADE RÉSUMÉ');
+        }),
+      );
+
+      final payload = factory.lastPayload!;
+      expect(
+        _containsSequence(payload, <int>[0x1B, 0x40, 0x1B, 0x74, 0x10]),
+        isTrue,
+      );
+      expect(
+        _containsSequence(payload, latin1.encode('FAÇADE RÉSUMÉ')),
+        isTrue,
+      );
+    });
+
+    test('allows disabling code table in PrintOptions', () async {
+      final factory = FakeTransportFactory();
+      final client = EscPosClient(transportFactory: factory);
+
+      await client.connect(const WifiEndpoint('127.0.0.1'));
+      await client.print(
+        template: ReceiptTemplate.dsl((builder) {
+          builder.text('Test');
+        }),
+        printOptions: const PrintOptions(codeTable: null),
+      );
+
+      final payload = factory.lastPayload!;
+      expect(_containsSequence(payload, <int>[0x1B, 0x74]), isFalse);
+    });
+
+    test('prints string template with variables', () async {
       final factory = FakeTransportFactory();
       final client = EscPosClient(transportFactory: factory);
 
@@ -115,26 +154,26 @@ void main() {
       );
     });
 
-    test('combina DSL com textTemplate e templateBlock', () async {
+    test('combines DSL with textTemplate and templateBlock', () async {
       final factory = FakeTransportFactory();
       final client = EscPosClient(transportFactory: factory);
       await client.connect(const WifiEndpoint('127.0.0.1'));
 
       final template = ReceiptTemplate.dsl((builder) {
-        builder.text('CABECALHO', align: TextAlign.center, bold: true);
+        builder.text('HEADER', align: TextAlign.center, bold: true);
         builder.textTemplate(
-          'Cliente: {{name}}',
+          'Customer: {{name}}',
           vars: <String, Object?>{'name': 'Ana'},
         );
         builder.templateBlock(
           '''
 @row
-  @col flex=2 Produto
+  @col flex=2 Product
   @col flex=1 align=right {{price}}
 @endrow
 @feed lines=1
 ''',
-          vars: <String, Object?>{'price': '9,90'},
+          vars: <String, Object?>{'price': '9.90'},
         );
         builder.cut(CutMode.partial);
       });
@@ -142,15 +181,15 @@ void main() {
       await client.print(template: template);
 
       final payload = factory.lastPayload!;
-      expect(_containsAscii(payload, 'CABECALHO'), isTrue);
-      expect(_containsAscii(payload, 'Cliente: Ana'), isTrue);
-      expect(_containsAscii(payload, 'Produto'), isTrue);
-      expect(_containsAscii(payload, '9,90'), isTrue);
+      expect(_containsAscii(payload, 'HEADER'), isTrue);
+      expect(_containsAscii(payload, 'Customer: Ana'), isTrue);
+      expect(_containsAscii(payload, 'Product'), isTrue);
+      expect(_containsAscii(payload, '9.90'), isTrue);
       expect(_containsSequence(payload, <int>[0x1B, 0x64, 0x01]), isTrue);
       expect(_containsSequence(payload, <int>[0x1D, 0x56, 0x01]), isTrue);
     });
 
-    test('faz retry com reconexao quando primeira escrita falha', () async {
+    test('retries with reconnection when first write fails', () async {
       final factory = FakeTransportFactory(failFirstWrite: true);
       final client = EscPosClient(
         transportFactory: factory,
@@ -168,7 +207,7 @@ void main() {
     });
 
     test(
-      'gera bytes para qrcode, barcode, image, feed, cut e drawer',
+      'generates bytes for qrcode, barcode, image, feed, cut, and drawer',
       () async {
         final factory = FakeTransportFactory();
         final client = EscPosClient(transportFactory: factory);
@@ -219,7 +258,7 @@ void main() {
   });
 
   group('Discovery', () {
-    test('agrega Wi-Fi e nativo com deduplicacao por chave estavel', () async {
+    test('aggregates Wi-Fi and native with stable-key deduplication', () async {
       final wifi = FakeWifiDiscovery(<DiscoveredPrinter>[
         DiscoveredPrinter(
           id: 'wifi-1',
@@ -273,7 +312,7 @@ void main() {
       );
     });
 
-    test('aplica filtro de transportes na busca', () async {
+    test('applies transport filter during search', () async {
       final wifi = FakeWifiDiscovery(<DiscoveredPrinter>[
         DiscoveredPrinter(
           id: 'wifi-1',
@@ -313,34 +352,31 @@ void main() {
       expect(onlyWifi.first.transport, DiscoveryTransport.wifi);
     });
 
-    test(
-      'mapeia USB com COM + VID/PID para endpoint serial no bridge',
-      () async {
-        final bridge = NativeTransportBridge(
-          api: FakeNativeTransportApi(<DiscoveredDevicePayload>[
-            const DiscoveredDevicePayload(
-              id: 'usb-com-3',
-              name: 'POS USB',
-              transport: 'usb',
-              comPort: 'COM3',
-              serialNumber: 'COM3',
-              vendorId: 0x04B8,
-              productId: 0x0E15,
-            ),
-          ]),
-        );
+    test('maps USB with COM + VID/PID to serial endpoint in bridge', () async {
+      final bridge = NativeTransportBridge(
+        api: FakeNativeTransportApi(<DiscoveredDevicePayload>[
+          const DiscoveredDevicePayload(
+            id: 'usb-com-3',
+            name: 'POS USB',
+            transport: 'usb',
+            comPort: 'COM3',
+            serialNumber: 'COM3',
+            vendorId: 0x04B8,
+            productId: 0x0E15,
+          ),
+        ]),
+      );
 
-        final devices = await bridge.searchNativePrinters(
-          transports: const <DiscoveryTransport>{DiscoveryTransport.usb},
-        );
+      final devices = await bridge.searchNativePrinters(
+        transports: const <DiscoveryTransport>{DiscoveryTransport.usb},
+      );
 
-        expect(devices.length, 1);
-        final endpoint = devices.first.endpoint as UsbEndpoint;
-        expect(endpoint.serialNumber, 'COM3');
-        expect(endpoint.vendorId, 0x04B8);
-        expect(endpoint.productId, 0x0E15);
-      },
-    );
+      expect(devices.length, 1);
+      final endpoint = devices.first.endpoint as UsbEndpoint;
+      expect(endpoint.serialNumber, 'COM3');
+      expect(endpoint.vendorId, 0x04B8);
+      expect(endpoint.productId, 0x0E15);
+    });
   });
 }
 
@@ -449,12 +485,12 @@ final class FakeTransport implements PrinterTransport {
   @override
   Future<void> write(List<int> data) async {
     if (!_connected) {
-      throw ConnectionException('Fake transport desconectado.');
+      throw ConnectionException('Fake transport disconnected.');
     }
 
     if (shouldFailFirstWrite && writes.isEmpty) {
       _connected = false;
-      throw TransportException('Falha simulada na primeira escrita.');
+      throw TransportException('Simulated failure on first write.');
     }
 
     writes.add(List<int>.from(data));
